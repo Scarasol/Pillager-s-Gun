@@ -1,0 +1,82 @@
+{
+  "bullet_hit_body": {
+    "category": "ambient",
+    "subtitle": "subtitles.bullet_hit_body",
+    "sounds": [
+      {
+        "name": "pillagers_gun:bullet_hit_body",
+        "stream": false
+      }
+    ]
+  },
+  "bullet_hit_ground": {
+    "category": "ambient",
+    "subtitle": "subtitles.bullet_hit_ground",
+    "sounds": [
+      {
+        "name": "pillagers_gun:bullet_hit_ground",
+        "stream": false
+      }
+    ]
+  },
+  "shotgun_fire": {
+    "category": "neutral",
+    "subtitle": "subtitles.shotgun_fire",
+    "sounds": [
+      {
+        "name": "pillagers_gun:shotgun_fire",
+        "stream": false
+      }
+    ]
+  },
+  "shotgun_reload": {
+    "category": "player",
+    "subtitle": "subtitles.shotgun_reload",
+    "sounds": [
+      {
+        "name": "pillagers_gun:shotgun_reload",
+        "stream": false
+      }
+    ]
+  },
+  "pistol_fire": {
+    "category": "player",
+    "subtitle": "subtitles.pistol_fire",
+    "sounds": [
+      {
+        "name": "pillagers_gun:pistol_fire_",
+        "stream": false
+      }
+    ]
+  },
+  "assault_rifle_fire": {
+    "category": "player",
+    "subtitle": "subtitles.assault_rifle_fire",
+    "sounds": [
+      {
+        "name": "pillagers_gun:assault_rifle_fire",
+        "stream": false
+      }
+    ]
+  },
+  "assault_rifle_reload": {
+    "category": "player",
+    "subtitle": "subtitles.assault_rifle_reload",
+    "sounds": [
+      {
+        "name": "pillagers_gun:assault_rifle_reload",
+        "stream": false
+      }
+    ]
+  },
+  "pistol_reload": {
+    "category": "player",
+    "subtitle": "subtitles.pistol_reload",
+    "sounds": [
+      {
+        "name": "pillagers_gun:pistol_reload",
+        "stream": false
+      }
+    ]
+  }
+}

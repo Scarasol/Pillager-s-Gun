@@ -1,0 +1,7 @@
+{
+  "parent": "pillagers_gun:custom/assault_rifle",
+  "textures": {
+    "5": "pillagers_gun:block/assault_rifle",
+    "particle": "pillagers_gun:item/gun"
+  }
+}

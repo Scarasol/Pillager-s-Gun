@@ -1,0 +1,16 @@
+{
+  "item.pillagers_gun.assault_rifle": "突击步枪",
+  "item.pillagers_gun.assault_rifle_ammo": "突击步枪子弹",
+  "item.pillagers_gun.pistol": "手枪",
+  "item.pillagers_gun.pistol_ammo": "手枪子弹",
+  "item.pillagers_gun.shotgun": "霰弹枪",
+  "item.pillagers_gun.shotgun_ammo": "霰弹枪子弹",
+  "subtitles.assault_rifle_fire": "突击步枪：开火",
+  "subtitles.assault_rifle_reload": "突击步枪：装弹",
+  "subtitles.bullet_hit_body": "子弹：击中目标",
+  "subtitles.bullet_hit_ground": "子弹：击中地面",
+  "subtitles.pistol_fire": "手枪：开火",
+  "subtitles.pistol_reload": "手枪：装弹",
+  "subtitles.shotgun_fire": "霰弹枪：开火",
+  "subtitles.shotgun_reload": "霰弹枪：装弹"
+}
