@@ -1,0 +1,19 @@
+{
+  "required": true,
+  "package": "com.scarasol.pillagers_gun.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "pillagers_gun.refmap.json",
+  "plugin": "com.scarasol.pillagers_gun.mixin.plugin.MixinPlugin",
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "minVersion": "0.8",
+  "mixins": [
+    "PillagerMixin",
+    "recruits.RecruitVillagerRendererMixin"
+  ],
+  "client": [
+    "PlayerRendererMixin",
+    "guardvillagers.GuardRendererMixin"
+  ]
+}
