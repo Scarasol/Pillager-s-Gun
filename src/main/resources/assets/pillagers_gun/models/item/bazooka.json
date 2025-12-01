@@ -1,0 +1,7 @@
+{
+  "parent": "pillagers_gun:custom/bazooka",
+  "textures": {
+    "0": "pillagers_gun:item/bazooka",
+    "particle": "pillagers_gun:item/gun"
+  }
+}

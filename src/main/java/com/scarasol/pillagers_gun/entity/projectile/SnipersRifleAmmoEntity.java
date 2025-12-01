@@ -1,0 +1,68 @@
+package com.scarasol.pillagers_gun.entity.projectile;
+
+import com.scarasol.pillagers_gun.config.CommonConfig;
+import com.scarasol.pillagers_gun.init.PillagersGunDamageTypes;
+import com.scarasol.pillagers_gun.init.PillagersGunEntities;
+import com.scarasol.pillagers_gun.init.PillagersGunSounds;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ShieldItem;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraftforge.network.PlayMessages;
+import net.minecraftforge.registries.ForgeRegistries;
+
+public class SnipersRifleAmmoEntity extends Ammo{
+
+    public SnipersRifleAmmoEntity(EntityType<? extends SnipersRifleAmmoEntity> entityType, Level level) {
+        super(entityType, level);
+    }
+
+    public SnipersRifleAmmoEntity(PlayMessages.SpawnEntity packet, Level world) {
+        super(PillagersGunEntities.SNIPERS_RIFLE_AMMO.get(), world);
+    }
+
+
+    public SnipersRifleAmmoEntity(Level level, LivingEntity livingEntity) {
+        super(PillagersGunEntities.SNIPERS_RIFLE_AMMO.get(), livingEntity, level);
+    }
+
+    public SnipersRifleAmmoEntity(Level level, double d, double d2, double d3) {
+        super(PillagersGunEntities.SNIPERS_RIFLE_AMMO.get(), d, d2, d3, level);
+    }
+
+    @Override
+    protected void onHitEntity(EntityHitResult entityHitResult) {
+        this.playSound(PillagersGunSounds.bullet_hit_body.get(), 1.0f, 1.0f);
+        Entity entity = entityHitResult.getEntity();
+        if (entity.invulnerableTime >= 10 && !CommonConfig.BYPASS_INVULNERABLE.get()){
+            this.discard();
+            return;
+        }
+        Entity owner = this.getOwner();
+
+        DamageSource ammo1 = PillagersGunDamageTypes.damageSource(this.level(), PillagersGunDamageTypes.AMMO, this, owner);
+        DamageSource ammo2 = PillagersGunDamageTypes.damageSource(this.level(), PillagersGunDamageTypes.AMMO_BYPASS_ARMOR, this, owner);
+        entity.invulnerableTime = 0;
+        entity.hurt(ammo1, CommonConfig.SNIPERS_RIFLE_POWER.get().floatValue() * (1 - CommonConfig.SNIPERS_RIFLE_BYPASS_RATE.get().floatValue()));
+        if (entity instanceof LivingEntity livingEntity && !livingEntity.isDamageSourceBlocked(ammo1)){
+            entity.invulnerableTime = 0;
+            entity.hurt(ammo2, CommonConfig.SNIPERS_RIFLE_POWER.get().floatValue() * CommonConfig.SNIPERS_RIFLE_BYPASS_RATE.get().floatValue());
+        }
+        if(entity instanceof Player player){
+            if(player.isDamageSourceBlocked(ammo1) && player.getUseItem().getItem() instanceof ShieldItem){
+                player.disableShield(true);
+            }
+        }else if(entity instanceof LivingEntity livingEntity){
+            if(livingEntity.isDamageSourceBlocked(ammo1) && livingEntity.getUseItem().getItem() instanceof ShieldItem){
+                livingEntity.stopUsingItem();
+            }
+        }
+        super.onHitEntity(entityHitResult);
+        this.discard();
+    }
+}

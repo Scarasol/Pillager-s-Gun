@@ -44,7 +44,7 @@
     "subtitle": "subtitles.pistol_fire",
     "sounds": [
       {
-        "name": "pillagers_gun:pistol_fire_",
+        "name": "pillagers_gun:pistol_fire",
         "stream": false
       }
     ]
@@ -55,6 +55,16 @@
     "sounds": [
       {
         "name": "pillagers_gun:assault_rifle_fire",
+        "stream": false
+      }
+    ]
+  },
+  "assault_rifle_fire_three_round": {
+    "category": "player",
+    "subtitle": "subtitles.assault_rifle_fire",
+    "sounds": [
+      {
+        "name": "pillagers_gun:assault_rifle_fire_three_round",
         "stream": false
       }
     ]
@@ -75,6 +85,46 @@
     "sounds": [
       {
         "name": "pillagers_gun:pistol_reload",
+        "stream": false
+      }
+    ]
+  },
+  "snipers_rifle_fire": {
+    "category": "player",
+    "subtitle": "subtitles.snipers_rifle_fire",
+    "sounds": [
+      {
+        "name": "pillagers_gun:snipers_rifle_fire",
+        "stream": false
+      }
+    ]
+  },
+  "snipers_rifle_reload": {
+    "category": "player",
+    "subtitle": "subtitles.snipers_rifle_reload",
+    "sounds": [
+      {
+        "name": "pillagers_gun:snipers_rifle_reload",
+        "stream": false
+      }
+    ]
+  },
+  "bazooka_fire": {
+    "category": "player",
+    "subtitle": "subtitles.bazooka_fire",
+    "sounds": [
+      {
+        "name": "pillagers_gun:bazooka_fire",
+        "stream": false
+      }
+    ]
+  },
+  "bazooka_reload": {
+    "category": "player",
+    "subtitle": "subtitles.bazooka_reload",
+    "sounds": [
+      {
+        "name": "pillagers_gun:bazooka_reload",
         "stream": false
       }
     ]

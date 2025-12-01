@@ -20,8 +20,13 @@ public class PillagersGunSounds {
     public static final RegistryObject<SoundEvent> shotgun_reload = REGISTRY.register("shotgun_reload", () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(PillagersGunMod.MODID, "shotgun_reload")));
     public static final RegistryObject<SoundEvent> pistol_fire = REGISTRY.register("pistol_fire", () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(PillagersGunMod.MODID, "pistol_fire")));
     public static final RegistryObject<SoundEvent> assault_rifle_fire = REGISTRY.register("assault_rifle_fire", () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(PillagersGunMod.MODID, "assault_rifle_fire")));
+    public static final RegistryObject<SoundEvent> assault_rifle_fire_three_round = REGISTRY.register("assault_rifle_fire_three_round", () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(PillagersGunMod.MODID, "assault_rifle_fire_three_round")));
     public static final RegistryObject<SoundEvent> assault_rifle_reload = REGISTRY.register("assault_rifle_reload", () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(PillagersGunMod.MODID, "assault_rifle_reload")));
     public static final RegistryObject<SoundEvent> pistol_reload = REGISTRY.register("pistol_reload", () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(PillagersGunMod.MODID, "pistol_reload")));
+    public static final RegistryObject<SoundEvent> snipers_rifle_fire = REGISTRY.register("snipers_rifle_fire", () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(PillagersGunMod.MODID, "snipers_rifle_fire")));
+    public static final RegistryObject<SoundEvent> snipers_rifle_reload = REGISTRY.register("snipers_rifle_reload", () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(PillagersGunMod.MODID, "snipers_rifle_reload")));
+    public static final RegistryObject<SoundEvent> bazooka_fire = REGISTRY.register("bazooka_fire", () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(PillagersGunMod.MODID, "bazooka_fire")));
+    public static final RegistryObject<SoundEvent> bazooka_reload = REGISTRY.register("bazooka_reload", () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(PillagersGunMod.MODID, "bazooka_reload")));
 
 
 }

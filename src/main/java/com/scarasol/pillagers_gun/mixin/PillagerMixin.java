@@ -23,8 +23,11 @@ public abstract class PillagerMixin extends AbstractIllager implements CrossbowA
 
     @Inject(method = "getArmPose", at = @At("RETURN"), cancellable = true)
     private void onGetArmPose(CallbackInfoReturnable<IllagerArmPose> cir){
-        if (this.isHolding(is -> is.getItem() instanceof GunItem) && !this.isChargingCrossbow()){
-            cir.setReturnValue(AbstractIllager.IllagerArmPose.CROSSBOW_HOLD);
+        if (this.isHolding(is -> is.getItem() instanceof GunItem)){
+            if (!this.isChargingCrossbow())
+                cir.setReturnValue(AbstractIllager.IllagerArmPose.CROSSBOW_HOLD);
+            else
+                cir.setReturnValue(IllagerArmPose.CROSSBOW_CHARGE);
         }
     }
 }

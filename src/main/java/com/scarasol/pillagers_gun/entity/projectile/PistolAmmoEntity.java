@@ -2,7 +2,10 @@ package com.scarasol.pillagers_gun.entity.projectile;
 
 import com.google.common.collect.Lists;
 import com.scarasol.pillagers_gun.config.CommonConfig;
+import com.scarasol.pillagers_gun.init.PillagersGunDamageTypes;
 import com.scarasol.pillagers_gun.init.PillagersGunEntities;
+import com.scarasol.pillagers_gun.init.PillagersGunSounds;
+import com.scarasol.sona.SonaMod;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.Arrays;
 import java.util.List;
@@ -13,6 +16,8 @@ import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.tags.DamageTypeTags;
+import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -77,26 +82,19 @@ public class PistolAmmoEntity extends Ammo{
 
     @Override
     protected void onHitEntity(EntityHitResult entityHitResult) {
-        this.playSound(ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation("pillagers_gun:bullet_hit_body")), 1.0f, 1.0f);
+        this.playSound(PillagersGunSounds.bullet_hit_body.get(), 1.0f, 1.0f);
         Entity entity = entityHitResult.getEntity();
         if (entity.invulnerableTime >= 10 && !CommonConfig.BYPASS_INVULNERABLE.get()){
             this.discard();
             return;
         }
         Entity owner = this.getOwner();
-        DamageSource ammo1;
-        if (owner != null){
-            if (checkFriendlyFire(entity, owner)){
-                this.discard();
-                return;
-            }
-            ammo1 = this.level().damageSources().arrow(this, owner);
-        }else {
-            ammo1 = this.level().damageSources().arrow(this, this);
-        }
-        super.onHitEntity(entityHitResult);
+
+
+        DamageSource ammo1 = PillagersGunDamageTypes.damageSource(this.level(), PillagersGunDamageTypes.AMMO, this, owner);
         entity.invulnerableTime = 0;
         entity.hurt(ammo1, CommonConfig.PISTOL_POWER.get());
+        super.onHitEntity(entityHitResult);
         this.discard();
     }
 }

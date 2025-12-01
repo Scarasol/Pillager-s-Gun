@@ -1,19 +1,23 @@
 package com.scarasol.pillagers_gun.item.gun;
 
+import com.scarasol.pillagers_gun.compat.sbw.SbwCompat;
+import com.scarasol.pillagers_gun.compat.tacz.TaczCompat;
+import com.scarasol.pillagers_gun.config.CommonConfig;
 import com.scarasol.pillagers_gun.init.PillagersGunItems;
+import com.scarasol.pillagers_gun.init.PillagersGunSounds;
+import com.scarasol.pillagers_gun.item.ammo.AmmoItem;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.Item;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
 
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.world.level.Level;
+import net.minecraftforge.fml.ModList;
 
 
 public class AssaultRifleItem extends GunItem {
     private static final int MAX_CHARGE_DURATION = 60;
-    public static final int AMMO_COUNT = 10;
-    private static final int COOLDOWN = 10;
-    private static final int SHOT_COUNT = 3;
 
     public AssaultRifleItem() {
         super(new Item.Properties().stacksTo(1).rarity(Rarity.COMMON));
@@ -21,22 +25,22 @@ public class AssaultRifleItem extends GunItem {
 
     @Override
     public SoundEvent getFireSound(){
-        return ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation("pillagers_gun:assault_rifle_fire"));
+        return CommonConfig.AUTOMATIC_SHOOTING.get() ? PillagersGunSounds.assault_rifle_fire.get() : PillagersGunSounds.assault_rifle_fire_three_round.get();
     }
 
     @Override
     public SoundEvent getReloadSound(){
-        return ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation("pillagers_gun:assault_rifle_reload"));
+        return PillagersGunSounds.assault_rifle_reload.get();
     }
 
     @Override
-    public Item getAmmo(){
-        return PillagersGunItems.ASSAULT_RIFLE_AMMO.get();
+    public AmmoItem getAmmo(){
+        return (AmmoItem) PillagersGunItems.ASSAULT_RIFLE_AMMO.get();
     }
 
     @Override
     public int getAmmoCount() {
-        return AMMO_COUNT;
+        return CommonConfig.AUTOMATIC_SHOOTING.get() ? 30 : 10;
     }
 
     @Override
@@ -46,12 +50,22 @@ public class AssaultRifleItem extends GunItem {
 
     @Override
     public int getCooldownTime() {
-        return COOLDOWN;
+        return CommonConfig.AUTOMATIC_SHOOTING.get() ? 2 : 20;
     }
 
     @Override
     public int getShotCount() {
-        return SHOT_COUNT;
+        return CommonConfig.AUTOMATIC_SHOOTING.get() ? 1 : 3;
+    }
+
+    @Override
+    public int getInaccuracy() {
+        return CommonConfig.ASSAULT_INACCURACY.get();
+    }
+
+    @Override
+    public boolean shouldRenderLaser() {
+        return CommonConfig.ASSAULT_RENDER_LASER.get();
     }
 }
 

@@ -1,7 +1,9 @@
 package com.scarasol.pillagers_gun.entity.projectile;
 
 import com.scarasol.pillagers_gun.config.CommonConfig;
+import com.scarasol.pillagers_gun.init.PillagersGunDamageTypes;
 import com.scarasol.pillagers_gun.init.PillagersGunEntities;
+import com.scarasol.pillagers_gun.init.PillagersGunSounds;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
@@ -38,30 +40,18 @@ public class ShotgunAmmoEntity extends Ammo{
 
     @Override
     public void onHitEntity(EntityHitResult entityHitResult) {
-        this.playSound(ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation("pillagers_gun:bullet_hit_body")), 1.0f, 1.0f);
+        this.playSound(PillagersGunSounds.bullet_hit_body.get(), 1.0f, 1.0f);
         Entity entity = entityHitResult.getEntity();
         if (entity.invulnerableTime >= 10 && !CommonConfig.BYPASS_INVULNERABLE.get()){
             this.discard();
             return;
         }
         Entity owner = this.getOwner();
-        DamageSource ammo1;
-        if (owner != null){
-            if (checkFriendlyFire(entity, owner)){
-                this.discard();
-                return;
-            }
-            ammo1 = this.level().damageSources().arrow(this, owner);
-        }else {
-            ammo1 = this.level().damageSources().arrow(this, this);
-        }
-        int time = Mth.nextInt(this.level().getRandom(), 1, CommonConfig.SHOTGUN_COUNT.get());
-        super.onHitEntity(entityHitResult);
-        for (int i = 0; i < time; i++){
-            entity.invulnerableTime = 0;
-            entity.hurt(ammo1, CommonConfig.SHOTGUN_POWER.get());
-        }
-        if(new Random().nextDouble() < 0.1 * time){
+
+        DamageSource ammo1 = PillagersGunDamageTypes.damageSource(this.level(), PillagersGunDamageTypes.AMMO, this, owner);
+        entity.invulnerableTime = 0;
+        entity.hurt(ammo1, CommonConfig.SHOTGUN_POWER.get());
+        if(new Random().nextDouble() < 0.1){
             if(entity instanceof Player player){
                 if(player.isDamageSourceBlocked(ammo1) && player.getUseItem().getItem() instanceof ShieldItem){
                     player.disableShield(true);
@@ -72,6 +62,7 @@ public class ShotgunAmmoEntity extends Ammo{
                 }
             }
         }
+        super.onHitEntity(entityHitResult);
         this.discard();
     }
 }

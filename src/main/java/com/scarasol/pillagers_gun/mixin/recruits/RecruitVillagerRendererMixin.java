@@ -8,6 +8,7 @@ import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.world.InteractionHand;
+import net.minecraftforge.registries.ForgeRegistries;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -22,7 +23,13 @@ public abstract class RecruitVillagerRendererMixin extends MobRenderer<AbstractR
 
     @Inject(method = "getArmPose", at = @At("RETURN"), cancellable = true, remap = false)
     private static void OnGetArmPose(AbstractInventoryEntity recruit, InteractionHand hand, CallbackInfoReturnable<HumanoidModel.ArmPose> cir){
-        if (!recruit.isUsingItem() && recruit.getItemInHand(hand).getItem() instanceof GunItem && GunItem.isCharged(recruit.getItemInHand(hand)) && !recruit.swinging) {
+        if ((recruit.getItemInHand(hand).getItem() instanceof GunItem) && !recruit.swinging) {
+            if (GunItem.isCharged(recruit.getItemInHand(hand))) {
+                cir.setReturnValue(HumanoidModel.ArmPose.CROSSBOW_HOLD);
+            } else if (recruit.isUsingItem()) {
+                cir.setReturnValue(HumanoidModel.ArmPose.CROSSBOW_CHARGE);
+            }
+        }else if ("zombiekit:flamethrower".equals(ForgeRegistries.ITEMS.getKey(recruit.getItemInHand(hand).getItem()).toString())&& !recruit.swinging) {
             cir.setReturnValue(HumanoidModel.ArmPose.CROSSBOW_HOLD);
         }
     }

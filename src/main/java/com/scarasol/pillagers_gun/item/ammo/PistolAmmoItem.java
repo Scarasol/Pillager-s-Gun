@@ -9,7 +9,7 @@ import net.minecraft.world.item.ArrowItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
-public class PistolAmmoItem extends ArrowItem{
+public class PistolAmmoItem extends AmmoItem{
     public PistolAmmoItem() {
         super(new Item.Properties().stacksTo(64).rarity(Rarity.COMMON));
     }
@@ -17,6 +17,11 @@ public class PistolAmmoItem extends ArrowItem{
     @Override
     public AbstractArrow createArrow(Level level, ItemStack itemStack, LivingEntity livingEntity) {
         return new PistolAmmoEntity(level, livingEntity);
+    }
+
+    @Override
+    public float getSpeed() {
+        return 8;
     }
 }
 

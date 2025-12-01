@@ -2,6 +2,10 @@ package com.scarasol.pillagers_gun.item.gun;
 
 import com.google.common.collect.Lists;
 import com.scarasol.pillagers_gun.PillagersGunMod;
+import com.scarasol.pillagers_gun.compat.sbw.SbwCompat;
+import com.scarasol.pillagers_gun.compat.tacz.TaczCompat;
+import com.scarasol.pillagers_gun.entity.projectile.Ammo;
+import com.scarasol.pillagers_gun.item.ammo.AmmoItem;
 import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -22,6 +26,7 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.fml.ModList;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
@@ -30,7 +35,6 @@ import java.util.Random;
 import java.util.function.Predicate;
 
 public abstract class GunItem extends ProjectileWeaponItem implements Vanishable {
-    private static final float AMMO_POWER = 6F;
     private boolean startSoundPlayed = false;
     private final Predicate<ItemStack> AMMO = (itemStack -> itemStack.is(getAmmo()));
 
@@ -49,6 +53,7 @@ public abstract class GunItem extends ProjectileWeaponItem implements Vanishable
         return 0;
     }
 
+    @Override
     public UseAnim getUseAnimation(ItemStack p_40935_) {
         return UseAnim.CROSSBOW;
     }
@@ -63,16 +68,19 @@ public abstract class GunItem extends ProjectileWeaponItem implements Vanishable
         return AMMO;
     }
 
-    public abstract Item getAmmo();
+    public abstract AmmoItem getAmmo();
 
     public abstract int getAmmoCount();
-
 
     public abstract int getMaxChargeDuration();
 
     public abstract int getCooldownTime();
 
     public abstract int getShotCount();
+
+    public abstract int getInaccuracy();
+
+    public abstract boolean shouldRenderLaser();
 
 
     @Override
@@ -85,15 +93,15 @@ public abstract class GunItem extends ProjectileWeaponItem implements Vanishable
         return itemStack.is(this);
     }
 
-    private static float getShootingPower(ItemStack itemStack) {
-        return AMMO_POWER;
+    private static float getShootingPower(GunItem gunItem) {
+        return gunItem.getAmmo().getSpeed();
     }
 
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand interactionHand) {
         ItemStack itemstack = player.getItemInHand(interactionHand);
         if (isCharged(itemstack)) {
-            performShooting(level, player, interactionHand, itemstack, getShootingPower(itemstack), 1.0F);
+            performShooting(level, player, interactionHand, itemstack, 1.0F);
             player.getCooldowns().addCooldown(itemstack.getItem(), getCooldownTime());
             int ammo = itemstack.getOrCreateTag().getInt("ammo");
             if (ammo == 0)
@@ -228,7 +236,7 @@ public abstract class GunItem extends ProjectileWeaponItem implements Vanishable
         return f;
     }
 
-    public static void performShooting(Level level, LivingEntity livingEntity, InteractionHand interactionHand, ItemStack itemStack, float p_40892_, float p_40893_) {
+    public static void performShooting(Level level, LivingEntity livingEntity, InteractionHand interactionHand, ItemStack itemStack, float p_40893_) {
         if (itemStack.getItem() instanceof GunItem gunItem){
             List<ItemStack> list = getChargedProjectiles(itemStack);
             float[] afloat = getShotPitches(livingEntity.getRandom());
@@ -237,21 +245,35 @@ public abstract class GunItem extends ProjectileWeaponItem implements Vanishable
                 boolean flag = livingEntity instanceof Player && ((Player) livingEntity).getAbilities().instabuild;
                 if (!itemstack.isEmpty()) {
                     if (i == 0) {
-                        shootProjectile(level, livingEntity, interactionHand, itemStack, itemstack, flag, p_40892_, p_40893_, 0.0F);
+                        shootProjectile(level, livingEntity, interactionHand, itemStack, itemstack, flag, getShootingPower(gunItem), p_40893_, 0.0F);
                     } else {
-                        if (level.getRandom().nextDouble() < 0.5){
-                            shootProjectile(level, livingEntity, interactionHand, itemStack, itemstack, flag, p_40892_, p_40893_, new Random().nextFloat() * 5F);
-                        }else {
-                            shootProjectile(level, livingEntity, interactionHand, itemStack, itemstack, flag, p_40892_, p_40893_, new Random().nextFloat() * -5F);
-                        }
+                        shootProjectile(level, livingEntity, interactionHand, itemStack, itemstack, flag, getShootingPower(gunItem), p_40893_, (float) new Random().nextGaussian());
                     }
                 }
 
             }
-            level.playSound(null, livingEntity.getX(), livingEntity.getY(), livingEntity.getZ(), gunItem.getFireSound(), SoundSource.PLAYERS, 0.6F, afloat[0]);
+            gunItem.playSound(itemStack, livingEntity, level, afloat);
             onGunShot(level, livingEntity, itemStack);
         }
         
+    }
+
+    public void playSound(ItemStack itemStack, LivingEntity livingEntity, Level level, float[] afloat) {
+        if (!(livingEntity instanceof Player)) {
+            if (ModList.get().isLoaded("superbwarfare")) {
+                if (!ModList.get().isLoaded("tacz") || livingEntity.getId() % 2 == 0) {
+                    SbwCompat.playSound(SbwCompat.itemStackSwitch(itemStack), livingEntity);
+                } else {
+                    TaczCompat.playSound(TaczCompat.itemStackSwitch(itemStack), livingEntity);
+                }
+                return;
+            } else if (ModList.get().isLoaded("tacz")) {
+                TaczCompat.playSound(TaczCompat.itemStackSwitch(itemStack), livingEntity);
+                return;
+            }
+
+        }
+        level.playSound(null, livingEntity.getX(), livingEntity.getY(), livingEntity.getZ(), getFireSound(), SoundSource.PLAYERS, 4F, afloat[0]);
     }
 
     private static List<ItemStack> getChargedProjectiles(ItemStack itemStack) {
@@ -310,7 +332,7 @@ public abstract class GunItem extends ProjectileWeaponItem implements Vanishable
                 projectile.pickup = AbstractArrow.Pickup.CREATIVE_ONLY;
             }
             Vec3 vec31 = livingEntity.getUpVector(1.0F);
-            Quaternionf quaternionf = (new Quaternionf()).setAngleAxis((double)(p_40904_ * ((float)Math.PI / 180F)), vec31.x, vec31.y, vec31.z);
+            Quaternionf quaternionf = (new Quaternionf()).setAngleAxis(p_40904_ * ((float)Math.PI / 180F), vec31.x, vec31.y, vec31.z);
             Vec3 vec3 = livingEntity.getViewVector(1.0F);
             Vector3f vector3f = vec3.toVector3f().rotate(quaternionf);
             projectile.shoot(vector3f.x(), vector3f.y(), vector3f.z(), p_40902_, p_40903_);

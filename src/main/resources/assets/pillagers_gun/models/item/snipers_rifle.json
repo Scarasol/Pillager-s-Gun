@@ -1,0 +1,7 @@
+{
+  "parent": "pillagers_gun:custom/snipers_rifle",
+  "textures": {
+    "1": "pillagers_gun:item/snipers_rifle",
+    "particle": "pillagers_gun:item/gun"
+  }
+}

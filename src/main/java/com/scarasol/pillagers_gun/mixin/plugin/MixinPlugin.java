@@ -22,6 +22,8 @@ public class MixinPlugin implements IMixinConfigPlugin {
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
         if (mixinClassName.contains("recruits")) return getClass("com.talhanation.recruits.Main");
         if (mixinClassName.contains("guardvillagers")) return getClass("tallestegg.guardvillagers.GuardVillagers");
+        if (mixinClassName.contains("tacz")) return getClass("com.tacz.guns.GunMod");
+        if (mixinClassName.contains("sbw")) return getClass("com.atsuishio.superbwarfare.Mod");
         return true;
     }
 

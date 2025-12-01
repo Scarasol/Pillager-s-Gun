@@ -121,6 +121,18 @@ repositories {
      flatDir {
          dir 'libs'
      }
+    maven {
+        name = 'GeckoLib'
+        url 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/'
+    }
+    repositories {
+        maven {
+            url "https://cursemaven.com"
+            content {
+                includeGroup "curse.maven"
+            }
+        }
+    }
 }
 
 dependencies {
@@ -133,6 +145,17 @@ dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     implementation fg.deobf("tallestegg.guardvillagers:guardvillagers-1.20.1-1.6.7:1.6.7")
     implementation fg.deobf("com.talhanation.recruits:recruits-1.20.1-1.12.1:1.12.1")
+    implementation fg.deobf("curse.maven:sona-survival-101-1023345:7232988")
+    implementation fg.deobf("curse.maven:zombie-survival-kit-839371:7241685")
+    implementation fg.deobf('software.bernie.geckolib:geckolib-forge-1.20.1:4.4.9')
+    implementation fg.deobf("curse.maven:timeless-and-classics-zero-1028108:7278003")
+//    implementation fg.deobf("curse.maven:timeless-and-classics-zero-1028108:6654543")
+    implementation fg.deobf("curse.maven:tacz-lesraisins-tactical-equipements-1273094:6751092")
+    implementation fg.deobf("curse.maven:curios-309927:6418456")
+//    implementation fg.deobf("curse.maven:geckolib-388172:6789487")
+    implementation fg.deobf("curse.maven:geckolib-388172:7025129")
+    implementation fg.deobf("curse.maven:superb-warfare-1218165:6982132")
+    implementation fg.deobf("curse.maven:touhou-little-maid-355044:6979039")
 
     // Example mod dependency with JEI - using fg.deobf() ensures the dependency is remapped to your development mappings
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
@@ -214,4 +237,11 @@ publishing {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+}
+
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
 }

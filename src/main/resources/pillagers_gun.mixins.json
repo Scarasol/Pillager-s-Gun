@@ -9,11 +9,21 @@
   },
   "minVersion": "0.8",
   "mixins": [
+    "NearestAttackableTargetGoalMixin",
     "PillagerMixin",
-    "recruits.RecruitVillagerRendererMixin"
+    "guardvillagers.GuardMixin",
+    "recruits.AbstractRecruitEntityMixin",
+    "recruits.RecruitVillagerRendererMixin",
+    "tacz.EntityKineticBulletMixin",
+    "tacz.EntityUtilMixin",
+    "tacz.LivingEntityAmmoCheckMixin",
+    "tacz.ModernKineticGunItemMixin"
   ],
   "client": [
+    "ItemInHandLayerMixin",
+    "LivingEntityRendererMixin",
     "PlayerRendererMixin",
-    "guardvillagers.GuardRendererMixin"
+    "guardvillagers.GuardRendererMixin",
+    "tacz.IllagerModelMixin"
   ]
 }

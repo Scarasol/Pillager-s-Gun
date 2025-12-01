@@ -1,12 +1,19 @@
 package com.scarasol.pillagers_gun.item.gun;
 
+import com.scarasol.pillagers_gun.compat.sbw.SbwCompat;
+import com.scarasol.pillagers_gun.compat.tacz.TaczCompat;
+import com.scarasol.pillagers_gun.config.CommonConfig;
 import com.scarasol.pillagers_gun.init.PillagersGunItems;
+import com.scarasol.pillagers_gun.init.PillagersGunSounds;
+import com.scarasol.pillagers_gun.item.ammo.AmmoItem;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.Item;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
 
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.world.level.Level;
+import net.minecraftforge.fml.ModList;
 
 public class PistolItem extends GunItem {
     private static final int MAX_CHARGE_DURATION = 40;
@@ -20,17 +27,17 @@ public class PistolItem extends GunItem {
 
     @Override
     public SoundEvent getFireSound(){
-        return ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation("pillagers_gun:pistol_fire"));
+        return PillagersGunSounds.pistol_fire.get();
     }
 
     @Override
     public SoundEvent getReloadSound(){
-        return ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation("pillagers_gun:pistol_reload"));
+        return PillagersGunSounds.pistol_reload.get();
     }
 
     @Override
-    public Item getAmmo(){
-        return PillagersGunItems.PISTOL_AMMO.get();
+    public AmmoItem getAmmo(){
+        return (AmmoItem) PillagersGunItems.PISTOL_AMMO.get();
     }
 
     @Override
@@ -51,6 +58,16 @@ public class PistolItem extends GunItem {
     @Override
     public int getShotCount() {
         return SHOT_COUNT;
+    }
+
+    @Override
+    public int getInaccuracy() {
+        return CommonConfig.PISTOL_INACCURACY.get();
+    }
+
+    @Override
+    public boolean shouldRenderLaser() {
+        return CommonConfig.PISTOL_RENDER_LASER.get();
     }
 }
 

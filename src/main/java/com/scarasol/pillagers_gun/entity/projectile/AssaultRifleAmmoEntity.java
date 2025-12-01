@@ -1,7 +1,9 @@
 package com.scarasol.pillagers_gun.entity.projectile;
 
 import com.scarasol.pillagers_gun.config.CommonConfig;
+import com.scarasol.pillagers_gun.init.PillagersGunDamageTypes;
 import com.scarasol.pillagers_gun.init.PillagersGunEntities;
+import com.scarasol.pillagers_gun.init.PillagersGunSounds;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
@@ -34,26 +36,16 @@ public class AssaultRifleAmmoEntity extends Ammo{
 
     @Override
     protected void onHitEntity(EntityHitResult entityHitResult) {
-        this.playSound(ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation("pillagers_gun:bullet_hit_body")), 1.0f, 1.0f);
+        this.playSound(PillagersGunSounds.bullet_hit_body.get(), 1.0f, 1.0f);
         Entity entity = entityHitResult.getEntity();
         if (entity.invulnerableTime >= 10 && !CommonConfig.BYPASS_INVULNERABLE.get()){
             this.discard();
             return;
         }
         Entity owner = this.getOwner();
-        DamageSource ammo1;
-        DamageSource ammo2;
-        if (owner != null){
-            if (checkFriendlyFire(entity, owner)){
-                this.discard();
-                return;
-            }
-            ammo1 = this.level().damageSources().arrow(this, owner);
-            ammo2 = this.level().damageSources().arrow(this, owner);
-        }else {
-            ammo1 = this.level().damageSources().arrow(this, this);
-            ammo2 = this.level().damageSources().arrow(this, this);
-        }
+
+        DamageSource ammo1 = PillagersGunDamageTypes.damageSource(this.level(), PillagersGunDamageTypes.AMMO, this, owner);
+        DamageSource ammo2 = PillagersGunDamageTypes.damageSource(this.level(), PillagersGunDamageTypes.AMMO_BYPASS_ARMOR, this, owner);
         entity.invulnerableTime = 0;
         entity.hurt(ammo1, CommonConfig.ASSAULT_POWER.get().floatValue() * (1 - CommonConfig.ASSAULT_BYPASS_RATE.get().floatValue()));
         if (entity instanceof LivingEntity livingEntity && !livingEntity.isDamageSourceBlocked(ammo1)){

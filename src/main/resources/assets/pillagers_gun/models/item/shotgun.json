@@ -1,7 +1,7 @@
 {
   "parent": "pillagers_gun:custom/shotgun",
   "textures": {
-    "2": "pillagers_gun:block/shotgun",
+    "2": "pillagers_gun:item/shotgun",
     "particle": "pillagers_gun:item/gun"
   }
 }
