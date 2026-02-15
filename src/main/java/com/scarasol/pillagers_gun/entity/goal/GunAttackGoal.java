@@ -21,6 +21,8 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.registries.ForgeRegistries;
 
+import javax.annotation.Nullable;
+
 /**
  * @author Scarasol
  */
@@ -38,6 +40,7 @@ public class GunAttackGoal<T extends Mob> extends Goal {
     private int ammoCount;
     private boolean away;
     private boolean stopped;
+    private Vec3 lastPositon;
 
     public GunAttackGoal(T mob, double speedModifier, float attackRadius) {
         this.mob = mob;
@@ -89,6 +92,7 @@ public class GunAttackGoal<T extends Mob> extends Goal {
         super.stop();
         this.mob.setAggressive(false);
         this.mob.setTarget(null);
+        lastPositon = null;
         this.seeTime = 0;
         if (this.mob.isUsingItem()) {
             this.mob.stopUsingItem();
@@ -212,7 +216,9 @@ public class GunAttackGoal<T extends Mob> extends Goal {
             }
 //            this.mob.onCrossbowAttackPerformed();
         }
-
+        if (isValidTarget()) {
+            lastPositon = livingentity.getEyePosition();
+        }
 
     }
 
@@ -223,6 +229,11 @@ public class GunAttackGoal<T extends Mob> extends Goal {
     public double vectorDegreeCalculate(Vec3 vec1, Vec3 vec2) {
         double cos = vec1.dot(vec2) / vec1.length() / vec2.length();
         return Math.toDegrees(Math.acos(cos));
+    }
+
+    @Nullable
+    public Vec3 getLastPositon() {
+        return lastPositon;
     }
 
     enum GunState {
