@@ -13,8 +13,11 @@ public class CommonConfig {
     public static final ForgeConfigSpec.ConfigValue<Double> EQUIP_CHANCE;
     public static final ForgeConfigSpec.ConfigValue<Double> DROP_CHANCE;
     public static final ForgeConfigSpec.ConfigValue<Boolean> BYPASS_INVULNERABLE;
+    public static final ForgeConfigSpec.ConfigValue<Boolean> DYNAMIC_INACCURACY;
     public static final ForgeConfigSpec.ConfigValue<Boolean> FRIEND_FIRE;
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> TAG_FRIENDLY_FIRE;
+    public static final ForgeConfigSpec.ConfigValue<Boolean> BREAK_GLASS;
+    public static final ForgeConfigSpec.ConfigValue<Double> LASER_ANGLE;
     public static final ForgeConfigSpec.ConfigValue<Boolean> GUN_MODEL;
 
     public static final ForgeConfigSpec.ConfigValue<Double> SHOTGUN_CHANCE;
@@ -81,10 +84,19 @@ public class CommonConfig {
                 .defineInRange("Drop Chance", 0, 0.0, 1.0);
         BYPASS_INVULNERABLE = BUILDER.comment("Whether bullets ignore damage immunity.")
                 .define("Ignore Damage Immunity", true);
+        DYNAMIC_INACCURACY = BUILDER.comment("Whether inaccuracy changes dynamically based on the target’s speed and distance.")
+                .define("Dynamic Inaccuracy", true);
         FRIEND_FIRE = BUILDER.comment("Whether the gun has friend fire.")
                 .define("Friend Fire", false);
         TAG_FRIENDLY_FIRE = BUILDER.comment("Entities sharing the same tag from this list will be treated as allies.")
                 .defineList("Friendly Tag", ArrayList::new, entry -> true);
+        BREAK_GLASS = BUILDER.comment("Whether the bullet will break the glass.")
+                .define("Break Glass", true);
+        LASER_ANGLE = BUILDER.comment("""
+                The laser will be rendered when the angle between the gun-wielding entity’s facing direction and the player is smaller than a certain threshold. 
+                Note that this angle gradually decreases as the distance between the player and the gun-wielding entity increases.
+                """)
+                .defineInRange("Laser Render Angle", 15.0, 5, 180);
         GUN_MODEL = BUILDER.comment("Whether the gun will use the models in tacz and sbw.")
                 .define("Gun Model Switch", false);
 

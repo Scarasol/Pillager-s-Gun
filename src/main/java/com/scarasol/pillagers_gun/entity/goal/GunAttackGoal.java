@@ -109,7 +109,7 @@ public class GunAttackGoal<T extends Mob> extends Goal {
         LivingEntity livingentity = this.mob.getTarget();
         boolean flag2 = false;
         boolean flag = false;
-        double attackRadius = this.mob.getAttributeBaseValue(Attributes.FOLLOW_RANGE);
+        double attackRadius = this.mob.getAttributeValue(Attributes.FOLLOW_RANGE);
         boolean isStunned = isStunned(this.mob);
         if (isValidTarget()) {
             this.mob.setAggressive(true);
@@ -192,7 +192,7 @@ public class GunAttackGoal<T extends Mob> extends Goal {
             InteractionHand interactionhand = ProjectileUtil.getWeaponHoldingHand(this.mob, item -> item instanceof GunItem);
             ItemStack itemstack = this.mob.getItemInHand(interactionhand);
             if (itemstack.getItem() instanceof GunItem gunItem) {
-                float inaccuracy = gunItem.getInaccuracy();
+                float inaccuracy = gunItem.getInaccuracy(livingentity);
                 if (isStunned) {
                     inaccuracy += 8;
                 }

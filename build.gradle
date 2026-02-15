@@ -148,7 +148,7 @@ dependencies {
     implementation fg.deobf("curse.maven:sona-survival-101-1023345:7232988")
     implementation fg.deobf("curse.maven:zombie-survival-kit-839371:7241685")
     implementation fg.deobf('software.bernie.geckolib:geckolib-forge-1.20.1:4.4.9')
-    implementation fg.deobf("curse.maven:timeless-and-classics-zero-1028108:7278003")
+    implementation fg.deobf("curse.maven:timeless-and-classics-zero-1028108:7401617-sources-7401626")
 //    implementation fg.deobf("curse.maven:timeless-and-classics-zero-1028108:6654543")
     implementation fg.deobf("curse.maven:tacz-lesraisins-tactical-equipements-1273094:6751092")
     implementation fg.deobf("curse.maven:curios-309927:6418456")
@@ -156,6 +156,7 @@ dependencies {
     implementation fg.deobf("curse.maven:geckolib-388172:7025129")
     implementation fg.deobf("curse.maven:superb-warfare-1218165:6982132")
     implementation fg.deobf("curse.maven:touhou-little-maid-355044:6979039")
+    implementation fg.deobf("curse.maven:tacz-unidict-1305429:7589418")
 
     // Example mod dependency with JEI - using fg.deobf() ensures the dependency is remapped to your development mappings
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime

@@ -16,6 +16,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
 import net.minecraft.world.phys.EntityHitResult;
@@ -36,6 +37,9 @@ public abstract class Ammo extends AbstractArrow {
 
     private int life = 0;
     public static final List<TagKey<EntityType<?>>> FRIENDLY_TAG = Lists.newArrayList();
+
+    public static final TagKey<Block> GLASS = BlockTags.create(new ResourceLocation("forge:glass"));
+    public static final TagKey<Block> GLASS_PANES = BlockTags.create(new ResourceLocation("forge:glass_panes"));
 
     protected Ammo(EntityType<? extends AbstractArrow> entityType, Level level) {
         super(entityType, level);
@@ -128,7 +132,7 @@ public abstract class Ammo extends AbstractArrow {
     protected void onHitBlock(BlockHitResult blockHitResult) {
         super.onHitBlock(blockHitResult);
         BlockState blockState = this.level().getBlockState(blockHitResult.getBlockPos());
-        if (blockState.is(BlockTags.create(new ResourceLocation("forge:glass"))) || blockState.is(BlockTags.create(new ResourceLocation("forge:glass_panes")))) {
+        if (CommonConfig.BREAK_GLASS.get() && (blockState.is(GLASS) || blockState.is(GLASS_PANES))) {
             this.level().destroyBlock(blockHitResult.getBlockPos(), false, this);
         } else {
             this.playSound(PillagersGunSounds.bullet_hit_ground.get(), 1, 1.0f);

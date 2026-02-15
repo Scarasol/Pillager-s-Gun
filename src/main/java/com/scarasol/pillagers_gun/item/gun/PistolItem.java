@@ -61,7 +61,7 @@ public class PistolItem extends GunItem {
     }
 
     @Override
-    public int getInaccuracy() {
+    public int getInaccuracy(LivingEntity target) {
         return CommonConfig.PISTOL_INACCURACY.get();
     }
 

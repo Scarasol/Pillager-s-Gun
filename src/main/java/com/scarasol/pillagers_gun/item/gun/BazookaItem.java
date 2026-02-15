@@ -62,7 +62,7 @@ public class BazookaItem extends GunItem {
     }
 
     @Override
-    public int getInaccuracy() {
+    public int getInaccuracy(LivingEntity target) {
         return CommonConfig.BAZOOKA_INACCURACY.get();
     }
 

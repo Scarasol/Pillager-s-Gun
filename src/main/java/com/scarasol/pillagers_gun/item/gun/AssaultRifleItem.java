@@ -59,7 +59,7 @@ public class AssaultRifleItem extends GunItem {
     }
 
     @Override
-    public int getInaccuracy() {
+    public int getInaccuracy(LivingEntity target) {
         return CommonConfig.ASSAULT_INACCURACY.get();
     }
 

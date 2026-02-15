@@ -78,7 +78,7 @@ public abstract class GunItem extends ProjectileWeaponItem implements Vanishable
 
     public abstract int getShotCount();
 
-    public abstract int getInaccuracy();
+    public abstract int getInaccuracy(LivingEntity target);
 
     public abstract boolean shouldRenderLaser();
 
