@@ -4,6 +4,7 @@ import java.util.EnumSet;
 
 import com.scarasol.pillagers_gun.PillagersGunMod;
 import com.scarasol.pillagers_gun.config.CommonConfig;
+import com.scarasol.pillagers_gun.event.EventFactory;
 import com.scarasol.pillagers_gun.item.gun.GunItem;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.TimeUtil;
@@ -163,59 +164,64 @@ public class GunAttackGoal<T extends Mob> extends Goal {
         if (this.gunState == GunAttackGoal.GunState.CHARGED && !GunItem.isCharged(this.mob.getItemInHand(InteractionHand.MAIN_HAND))){
             this.gunState = GunAttackGoal.GunState.UNCHARGED;
         }
-        if (this.gunState == GunAttackGoal.GunState.UNCHARGED) {
-            if (!flag2 && !isStunned) {
-                this.mob.startUsingItem(ProjectileUtil.getWeaponHoldingHand(this.mob, item -> item instanceof GunItem));
-                this.gunState = GunAttackGoal.GunState.CHARGING;
-                if (this.mob instanceof CrossbowAttackMob crossbowAttackMob) {
-                    crossbowAttackMob.setChargingCrossbow(true);
-                }
-            }
-        } else if (this.gunState == GunAttackGoal.GunState.CHARGING) {
-            if (!this.mob.isUsingItem()) {
-                this.gunState = GunAttackGoal.GunState.UNCHARGED;
-            }
-
-            int i = this.mob.getTicksUsingItem();
-            ItemStack itemstack = this.mob.getUseItem();
-            if (itemstack.getItem() instanceof GunItem gun && i >= GunItem.getChargeDuration(itemstack)) {
-                this.mob.releaseUsingItem();
-                this.gunState = GunAttackGoal.GunState.CHARGED;
-                this.attackDelay = 10 + this.mob.getRandom().nextInt(20) + gun.getCooldownTime();
-                ammoCount = GunItem.getCurrentAmmoCount(this.mob.getItemInHand(InteractionHand.MAIN_HAND));
-                if (this.mob instanceof CrossbowAttackMob crossbowAttackMob) {
-                    crossbowAttackMob.setChargingCrossbow(false);
-                }
-            }
-
-        } else if (this.gunState == GunAttackGoal.GunState.CHARGED) {
-            if (--this.attackDelay <= 0) {
-                this.gunState = GunAttackGoal.GunState.READY_TO_ATTACK;
-            }
-        } else if (this.gunState == GunAttackGoal.GunState.READY_TO_ATTACK && (flag || isStunned) && isRightAngle()) {
-            InteractionHand interactionhand = ProjectileUtil.getWeaponHoldingHand(this.mob, item -> item instanceof GunItem);
-            ItemStack itemstack = this.mob.getItemInHand(interactionhand);
-            if (itemstack.getItem() instanceof GunItem gunItem) {
-                float inaccuracy = gunItem.getInaccuracy(livingentity);
-                if (isStunned) {
-                    inaccuracy += 8;
-                }
-                GunItem.performShooting(this.mob.level(), this.mob, interactionhand, itemstack, inaccuracy);
-                ammoCount -= 1;
-                ItemStack itemstack1 = this.mob.getItemInHand(ProjectileUtil.getWeaponHoldingHand(this.mob, item -> item instanceof GunItem));
-                if (ammoCount <= 0) {
-                    GunItem.setCharged(itemstack1, false);
-                    this.gunState = GunAttackGoal.GunState.UNCHARGED;
-                } else {
-                    this.gunState = GunAttackGoal.GunState.CHARGED;
-                    if (itemstack1.getItem() instanceof GunItem gun) {
-                        this.attackDelay = gun.getCooldownTime();
+        switch (this.gunState) {
+            case UNCHARGED -> {
+                if (!flag2 && !isStunned) {
+                    this.mob.startUsingItem(ProjectileUtil.getWeaponHoldingHand(this.mob, item -> item instanceof GunItem));
+                    this.gunState = GunAttackGoal.GunState.CHARGING;
+                    if (this.mob instanceof CrossbowAttackMob crossbowAttackMob) {
+                        crossbowAttackMob.setChargingCrossbow(true);
                     }
-
                 }
             }
-//            this.mob.onCrossbowAttackPerformed();
+            case CHARGING -> {
+                if (!this.mob.isUsingItem()) {
+                    this.gunState = GunAttackGoal.GunState.UNCHARGED;
+                }
+                int i = this.mob.getTicksUsingItem();
+                ItemStack itemstack = this.mob.getUseItem();
+                if (itemstack.getItem() instanceof GunItem gun && i >= GunItem.getChargeDuration(itemstack)) {
+                    this.mob.releaseUsingItem();
+                    this.gunState = GunAttackGoal.GunState.CHARGED;
+                    this.attackDelay = 10 + this.mob.getRandom().nextInt(20) + gun.getCooldownTime();
+                    ammoCount = GunItem.getCurrentAmmoCount(this.mob.getItemInHand(InteractionHand.MAIN_HAND));
+                    if (this.mob instanceof CrossbowAttackMob crossbowAttackMob) {
+                        crossbowAttackMob.setChargingCrossbow(false);
+                    }
+                }
+            }
+            case CHARGED -> {
+                if (--this.attackDelay <= 0) {
+                    this.gunState = GunAttackGoal.GunState.READY_TO_ATTACK;
+                }
+            }
+            case READY_TO_ATTACK -> {
+                if ((flag || isStunned) && isRightAngle())  {
+                    InteractionHand interactionhand = ProjectileUtil.getWeaponHoldingHand(this.mob, item -> item instanceof GunItem);
+                    ItemStack itemstack = this.mob.getItemInHand(interactionhand);
+                    if (itemstack.getItem() instanceof GunItem gunItem) {
+                        float inaccuracy = EventFactory.getModifiedInaccuracy(gunItem.getInaccuracy(livingentity), mob, livingentity, getLastPositon());
+                        if (isStunned) {
+                            inaccuracy += 8;
+                        }
+                        GunItem.performShooting(this.mob.level(), this.mob, interactionhand, itemstack, inaccuracy);
+                        ammoCount -= 1;
+                        ItemStack itemstack1 = this.mob.getItemInHand(ProjectileUtil.getWeaponHoldingHand(this.mob, item -> item instanceof GunItem));
+                        if (ammoCount <= 0) {
+                            GunItem.setCharged(itemstack1, false);
+                            this.gunState = GunAttackGoal.GunState.UNCHARGED;
+                        } else {
+                            this.gunState = GunAttackGoal.GunState.CHARGED;
+                            if (itemstack1.getItem() instanceof GunItem gun) {
+                                this.attackDelay = gun.getCooldownTime();
+                            }
+
+                        }
+                    }
+                }
+            }
         }
+
         if (isValidTarget()) {
             lastPositon = livingentity.getEyePosition();
         }
