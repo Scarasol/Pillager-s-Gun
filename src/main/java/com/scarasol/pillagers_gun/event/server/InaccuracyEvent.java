@@ -1,6 +1,7 @@
 package com.scarasol.pillagers_gun.event.server;
 
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.eventbus.api.Event;
 
@@ -12,11 +13,11 @@ public class InaccuracyEvent extends Event {
     private float newInaccuracy;
 
     private final float oldInaccuracy;
-    private final Entity shooter;
+    private final Mob shooter;
     private final Entity target;
     private final Vec3 targetLastPosition;
 
-    public InaccuracyEvent(float oldInaccuracy, Entity shooter, Entity target, Vec3 targetLastPosition) {
+    public InaccuracyEvent(float oldInaccuracy, Mob shooter, Entity target, Vec3 targetLastPosition) {
         this.oldInaccuracy = oldInaccuracy;
         this.shooter = shooter;
         this.target = target;
@@ -41,7 +42,7 @@ public class InaccuracyEvent extends Event {
         return oldInaccuracy;
     }
 
-    public Entity getShooter() {
+    public Mob getShooter() {
         return shooter;
     }
 

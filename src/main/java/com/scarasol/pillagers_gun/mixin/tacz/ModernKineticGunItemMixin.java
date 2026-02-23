@@ -1,5 +1,6 @@
 package com.scarasol.pillagers_gun.mixin.tacz;
 
+import com.scarasol.pillagers_gun.api.IMob;
 import com.scarasol.pillagers_gun.compat.tacz.TaczCompat;
 import com.scarasol.pillagers_gun.entity.goal.GunAttackGoal;
 import com.scarasol.pillagers_gun.event.EventFactory;
@@ -32,13 +33,13 @@ public abstract class ModernKineticGunItemMixin extends Item implements IGun, IA
 
     @Inject(method = "lambda$doBulletSpread$29", cancellable = true, at = @At(value = "INVOKE", target = "Lcom/tacz/guns/entity/EntityKineticBullet;shootFromRotation(Lnet/minecraft/world/entity/Entity;FFFFF)V"))
     private static void pillagersGun$gunnerShoot(EntityKineticBullet bullet, LivingEntity shooter, float pitch, float yaw, float processedSpeed, float inaccuracy, CallbackInfo ci) {
-        if (shooter instanceof  Mob mob && shooter.getType().is(EventHandler.PILLAGER_GUNNER)) {
+        if (shooter instanceof Mob mob && shooter.getType().is(EventHandler.PILLAGER_GUNNER)) {
             ItemStack gunItem = shooter.getItemInHand(InteractionHand.MAIN_HAND);
             IGun iGun = IGun.getIGunOrNull(gunItem);
-            if (iGun != null) {
+            if (iGun != null && mob instanceof IMob iMob) {
 
                 TimelessAPI.getCommonGunIndex(iGun.getGunId(gunItem)).ifPresent((commonGunIndex) -> {
-                    float inaccuracyNew = EventFactory.getModifiedInaccuracy((float) TaczCompat.getInaccuracy(commonGunIndex.getType(), inaccuracy), shooter, mob.getTarget(), Vec3.ZERO);
+                    float inaccuracyNew = EventFactory.getModifiedInaccuracy((float) TaczCompat.getInaccuracy(commonGunIndex.getType(), inaccuracy), mob, mob.getTarget(), iMob.getPillagersGun$targetLastPositon());
                     if (GunAttackGoal.isStunned(shooter)) {
                         inaccuracyNew += 8;
                     }

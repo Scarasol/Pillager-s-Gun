@@ -11,8 +11,10 @@ import com.scarasol.pillagers_gun.config.CommonConfig;
 import com.scarasol.pillagers_gun.entity.goal.GunAttackGoal;
 import com.scarasol.pillagers_gun.entity.projectile.Ammo;
 import com.scarasol.pillagers_gun.entity.projectile.RocketEntity;
+import com.scarasol.pillagers_gun.event.server.InaccuracyEvent;
 import com.scarasol.pillagers_gun.init.PillagersGunItems;
 import com.scarasol.pillagers_gun.item.gun.GunItem;
+import com.scarasol.pillagers_gun.util.GunUtil;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
@@ -156,6 +158,15 @@ public class EventHandler {
     public static void knockbackCancel(LivingKnockBackEvent event) {
         if (event.getEntity().getPersistentData().getBoolean("ShootByGun")) {
             event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent
+    public static void modifyInaccuracy(InaccuracyEvent event) {
+        if (CommonConfig.DYNAMIC_INACCURACY.get() && event.getTarget() != null) {
+            float newInaccuracy = GunUtil.getModifiedInaccuracy(event.getShooter(), event.getTarget(), event.getOldInaccuracy());
+            PillagersGunMod.LOGGER.info("newInaccuracy: {}", newInaccuracy);
+            event.setNewInaccuracy(newInaccuracy);
         }
     }
 

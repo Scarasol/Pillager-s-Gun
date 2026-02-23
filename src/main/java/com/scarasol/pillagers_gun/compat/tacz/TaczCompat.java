@@ -186,6 +186,10 @@ public class TaczCompat {
         return false;
     }
 
+    public static boolean isSniperGun(ItemStack gunItem) {
+        return "sniper".equals(getGunType(gunItem));
+    }
+
     public static boolean shouldRenderLaser(ItemStack gunItem) {
 
         return CommonConfig.TACZ_RENDER_LASER.get().contains(getGunType(gunItem));

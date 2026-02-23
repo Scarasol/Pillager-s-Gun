@@ -1,6 +1,7 @@
 package com.scarasol.pillagers_gun.compat.tacz;
 
 import com.scarasol.pillagers_gun.PillagersGunMod;
+import com.scarasol.pillagers_gun.api.IMob;
 import com.scarasol.pillagers_gun.config.CommonConfig;
 import com.scarasol.pillagers_gun.entity.goal.GunAttackGoal;
 import com.scarasol.pillagers_gun.item.gun.GunItem;
@@ -29,6 +30,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.registries.ForgeRegistries;
 
+import javax.annotation.Nullable;
 import java.util.EnumSet;
 
 import static com.scarasol.pillagers_gun.entity.goal.GunAttackGoal.isStunned;
@@ -201,11 +203,13 @@ public class TaczGunAttackGoal<T extends Mob> extends Goal {
         if (this.isHoldingGun()) {
             IGunOperator gunOperator = IGunOperator.fromLivingEntity(this.mob);
             if (isValidTarget() && canMeleeAttack(gunOperator, livingentity)) {
+                setLastPositon(livingentity.getEyePosition());
                 gunOperator.melee();
                 return;
             }
             if (getGun().isOverheatLocked(itemStack)) {
                 this.gunState = TaczGunAttackGoal.GunState.UNCHARGED;
+                setLastPositon(livingentity.getEyePosition());
                 return;
             }
             if (this.gunState == TaczGunAttackGoal.GunState.UNCHARGED && hasAmmo()) {
@@ -277,7 +281,9 @@ public class TaczGunAttackGoal<T extends Mob> extends Goal {
 
             }
         }
-
+        if (isValidTarget()) {
+            setLastPositon(livingentity.getEyePosition());
+        }
 
 
     }
@@ -297,6 +303,20 @@ public class TaczGunAttackGoal<T extends Mob> extends Goal {
 
     public double getAttackReachSqr(LivingEntity target) {
         return this.mob.getBbWidth() * 2.0 * this.mob.getBbWidth() * 2.0 + target.getBbWidth();
+    }
+
+    @Nullable
+    public Vec3 getLastPositon() {
+        if (this.mob instanceof IMob iMob) {
+            return iMob.getPillagersGun$targetLastPositon();
+        }
+        return null;
+    }
+
+    public void setLastPositon(Vec3 lastPositon) {
+        if (this.mob instanceof IMob iMob) {
+            iMob.setPillagersGun$targetLastPositon(lastPositon);
+        }
     }
 
     enum GunState {

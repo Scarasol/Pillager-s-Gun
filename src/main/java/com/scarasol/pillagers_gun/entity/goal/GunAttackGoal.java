@@ -3,6 +3,7 @@ package com.scarasol.pillagers_gun.entity.goal;
 import java.util.EnumSet;
 
 import com.scarasol.pillagers_gun.PillagersGunMod;
+import com.scarasol.pillagers_gun.api.IMob;
 import com.scarasol.pillagers_gun.config.CommonConfig;
 import com.scarasol.pillagers_gun.event.EventFactory;
 import com.scarasol.pillagers_gun.item.gun.GunItem;
@@ -41,7 +42,6 @@ public class GunAttackGoal<T extends Mob> extends Goal {
     private int ammoCount;
     private boolean away;
     private boolean stopped;
-    private Vec3 lastPositon;
 
     public GunAttackGoal(T mob, double speedModifier, float attackRadius) {
         this.mob = mob;
@@ -93,7 +93,7 @@ public class GunAttackGoal<T extends Mob> extends Goal {
         super.stop();
         this.mob.setAggressive(false);
         this.mob.setTarget(null);
-        lastPositon = null;
+        setLastPositon(null);
         this.seeTime = 0;
         if (this.mob.isUsingItem()) {
             this.mob.stopUsingItem();
@@ -223,7 +223,7 @@ public class GunAttackGoal<T extends Mob> extends Goal {
         }
 
         if (isValidTarget()) {
-            lastPositon = livingentity.getEyePosition();
+            setLastPositon(livingentity.getEyePosition());
         }
 
     }
@@ -239,7 +239,16 @@ public class GunAttackGoal<T extends Mob> extends Goal {
 
     @Nullable
     public Vec3 getLastPositon() {
-        return lastPositon;
+        if (this.mob instanceof IMob iMob) {
+            return iMob.getPillagersGun$targetLastPositon();
+        }
+        return null;
+    }
+
+    public void setLastPositon(Vec3 lastPositon) {
+        if (this.mob instanceof IMob iMob) {
+            iMob.setPillagersGun$targetLastPositon(lastPositon);
+        }
     }
 
     enum GunState {
