@@ -57,8 +57,7 @@ public class GunUtil {
 
     public static Vec3 getTargetDeltaMovement(Mob attacker, Entity target) {
         if (attacker instanceof IMob iMob) {
-            PillagersGunMod.LOGGER.info("targetV: {}", target.getEyePosition().subtract(iMob.getPillagersGun$targetLastPositon()).length());
-            return target.getEyePosition().subtract(iMob.getPillagersGun$targetLastPositon());
+           return target.getEyePosition().subtract(iMob.getPillagersGun$targetLastPositon());
         }
         return target.getDeltaMovement();
     }

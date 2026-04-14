@@ -165,7 +165,6 @@ public class EventHandler {
     public static void modifyInaccuracy(InaccuracyEvent event) {
         if (CommonConfig.DYNAMIC_INACCURACY.get() && event.getTarget() != null) {
             float newInaccuracy = GunUtil.getModifiedInaccuracy(event.getShooter(), event.getTarget(), event.getOldInaccuracy());
-            PillagersGunMod.LOGGER.info("newInaccuracy: {}", newInaccuracy);
             event.setNewInaccuracy(newInaccuracy);
         }
     }
