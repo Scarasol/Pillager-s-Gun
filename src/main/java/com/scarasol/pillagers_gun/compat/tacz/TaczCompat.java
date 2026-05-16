@@ -4,6 +4,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.scarasol.pillagers_gun.PillagersGunMod;
 import com.scarasol.pillagers_gun.config.CommonConfig;
+import com.scarasol.pillagers_gun.entity.goal.controller.EmptyGunController;
+import com.scarasol.pillagers_gun.entity.goal.controller.GunController;
 import com.scarasol.pillagers_gun.event.EventHandler;
 import com.scarasol.pillagers_gun.init.PillagersGunItems;
 import com.tacz.guns.api.DefaultAssets;
@@ -194,5 +196,10 @@ public class TaczCompat {
 
         return CommonConfig.TACZ_RENDER_LASER.get().contains(getGunType(gunItem));
 
+    }
+
+    public static GunController createGunController(Mob mob) {
+        GunController controller = new TaczGunController(mob);
+        return controller.isValid() ? controller : EmptyGunController.INSTANCE;
     }
 }

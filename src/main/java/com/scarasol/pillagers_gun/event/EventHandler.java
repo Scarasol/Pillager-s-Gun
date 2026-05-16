@@ -5,7 +5,6 @@ import com.scarasol.pillagers_gun.PillagersGunMod;
 import com.scarasol.pillagers_gun.compat.guardvillagers.GuardUseGun;
 import com.scarasol.pillagers_gun.compat.recruits.RecruitUseGun;
 import com.scarasol.pillagers_gun.compat.tacz.TaczCompat;
-import com.scarasol.pillagers_gun.compat.tacz.TaczGunAttackGoal;
 import com.scarasol.pillagers_gun.compat.zombiekit.MobUseFlameThrower;
 import com.scarasol.pillagers_gun.config.CommonConfig;
 import com.scarasol.pillagers_gun.entity.goal.GunAttackGoal;
@@ -61,9 +60,6 @@ public class EventHandler {
         }
         if (entity.getType().is(PILLAGER_GUNNER) && entity instanceof Mob mob) {
             mob.goalSelector.addGoal(1, new GunAttackGoal<>(mob, 1.0D, 64.0F));
-            if (ModList.get().isLoaded("tacz") && CommonConfig.TACZ_GUN_USE.get()) {
-                mob.goalSelector.addGoal(1, new TaczGunAttackGoal<>(mob, 1.0D));
-            }
             mob.setLeftHanded(false);
             if (!event.loadedFromDisk()) {
                 String id = ForgeRegistries.ENTITY_TYPES.getKey(mob.getType()).toString();

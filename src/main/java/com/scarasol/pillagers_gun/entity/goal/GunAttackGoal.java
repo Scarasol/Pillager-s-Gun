@@ -1,29 +1,22 @@
 package com.scarasol.pillagers_gun.entity.goal;
 
-import java.util.EnumSet;
-
-import com.scarasol.pillagers_gun.PillagersGunMod;
 import com.scarasol.pillagers_gun.api.IMob;
-import com.scarasol.pillagers_gun.config.CommonConfig;
-import com.scarasol.pillagers_gun.event.EventFactory;
-import com.scarasol.pillagers_gun.item.gun.GunItem;
+import com.scarasol.pillagers_gun.entity.goal.controller.EmptyGunController;
+import com.scarasol.pillagers_gun.entity.goal.controller.GunController;
+import com.scarasol.pillagers_gun.entity.goal.controller.GunControllerFactory;
+import com.scarasol.pillagers_gun.entity.goal.controller.GunReloadResult;
+import com.scarasol.pillagers_gun.entity.goal.controller.GunShotResult;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.TimeUtil;
-import net.minecraft.util.valueproviders.UniformInt;
-import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.monster.CrossbowAttackMob;
-import net.minecraft.world.entity.monster.RangedAttackMob;
-import net.minecraft.world.entity.projectile.ProjectileUtil;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.entity.ai.goal.Goal;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import javax.annotation.Nullable;
+import java.util.EnumSet;
 
 /**
  * @author Scarasol
@@ -34,9 +27,9 @@ public class GunAttackGoal<T extends Mob> extends Goal {
     public static MobEffect BLIND = ForgeRegistries.MOB_EFFECTS.getValue(new ResourceLocation("lrtactical:blinded"));
 
     private final T mob;
-    private GunAttackGoal.GunState gunState = GunAttackGoal.GunState.UNCHARGED;
     private final double speedModifier;
-//    private final float attackRadius;
+    private GunController controller = EmptyGunController.INSTANCE;
+    private GunState gunState = GunState.UNCHARGED;
     private int seeTime;
     private int attackDelay;
     private int ammoCount;
@@ -46,7 +39,6 @@ public class GunAttackGoal<T extends Mob> extends Goal {
     public GunAttackGoal(T mob, double speedModifier, float attackRadius) {
         this.mob = mob;
         this.speedModifier = speedModifier;
-//        this.attackRadius = attackRadius;
         this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
     }
 
@@ -56,24 +48,176 @@ public class GunAttackGoal<T extends Mob> extends Goal {
 
     @Override
     public boolean canUse() {
-        return this.isHoldingGun() && (this.isValidTarget() || !hasAmmo() || isStunned(this.mob));
-    }
-
-    private boolean isHoldingGun() {
-        return this.mob.getItemInHand(InteractionHand.MAIN_HAND).getItem() instanceof GunItem;
+        GunController gunController = controller();
+        return gunController.isValid() && (this.isValidTarget() || (!gunController.hasAmmo() && gunController.canReload()) || isStunned(this.mob));
     }
 
     @Override
     public boolean canContinueToUse() {
-        return this.isHoldingGun() && (this.isValidTarget() || !hasAmmo() || isStunned(this.mob));
+        GunController gunController = controller();
+        return gunController.isValid() && (this.isValidTarget() || (!gunController.hasAmmo() && gunController.canReload()) || isStunned(this.mob));
+    }
+
+    @Override
+    public void start() {
+        this.controller = GunControllerFactory.create(this.mob);
+        this.gunState = GunState.UNCHARGED;
+        this.seeTime = 0;
+        this.attackDelay = 0;
+        this.ammoCount = 0;
+        this.away = false;
+        this.stopped = false;
+        this.controller.start();
+    }
+
+    @Override
+    public void stop() {
+        super.stop();
+        this.mob.setAggressive(false);
+        this.mob.setTarget(null);
+        setLastPositon(null);
+        this.seeTime = 0;
+        this.attackDelay = 0;
+        this.ammoCount = 0;
+        this.away = false;
+        this.stopped = false;
+        this.controller.stop();
+        this.controller = EmptyGunController.INSTANCE;
+        this.mob.getNavigation().stop();
+    }
+
+    @Override
+    public boolean requiresUpdateEveryTick() {
+        return true;
+    }
+
+    @Override
+    public void tick() {
+        GunController gunController = controller();
+        if (!gunController.isValid()) {
+            return;
+        }
+
+        LivingEntity livingentity = this.mob.getTarget();
+        boolean targetValid = this.isValidTarget();
+        boolean flag2 = false;
+        boolean flag = false;
+        double attackRadius = this.mob.getAttributeValue(Attributes.FOLLOW_RANGE);
+        boolean stunned = isStunned(this.mob);
+
+        if (targetValid) {
+            this.mob.setAggressive(true);
+            double d0 = livingentity.position().subtract(this.mob.position()).length();
+            flag = this.mob.getSensing().hasLineOfSight(livingentity) && !stunned;
+            if (flag) {
+                ++this.seeTime;
+            } else {
+                this.seeTime = 0;
+            }
+
+            if (!stunned) {
+                if (d0 <= attackRadius && this.seeTime > 5) {
+                    if (!gunController.hasAmmo()) {
+                        this.stopped = false;
+                        if (d0 < attackRadius / 2) {
+                            this.away = true;
+                            Vec3 vec3 = this.mob.position().add(this.mob.position().subtract(livingentity.position().x, this.mob.position().y, livingentity.position().z).normalize().scale(attackRadius / 2));
+                            this.mob.getNavigation().moveTo(vec3.x, vec3.y, vec3.z, this.speedModifier);
+                        }
+                        if (this.away && d0 > attackRadius * 2 / 3) {
+                            this.mob.getNavigation().stop();
+                            this.away = false;
+                        } else if (!this.away && d0 < attackRadius * 2 / 3) {
+                            this.mob.getNavigation().stop();
+                        }
+                    } else if (!this.stopped) {
+                        this.mob.getNavigation().stop();
+                        this.stopped = true;
+                    }
+                } else {
+                    this.stopped = false;
+                    this.mob.getNavigation().moveTo(livingentity, this.canRun() ? this.speedModifier : this.speedModifier * 0.5D);
+                }
+                this.mob.getLookControl().setLookAt(livingentity, 30.0F, 30.0F);
+            }
+            flag2 = (d0 > attackRadius || this.seeTime < 5) && this.attackDelay == 0;
+        }
+
+        if (targetValid && gunController.canMeleeAttack(livingentity)) {
+            setLastPositon(livingentity.getEyePosition());
+            gunController.meleeAttack(livingentity);
+            return;
+        }
+
+        if (gunController.isAttackBlocked()) {
+            this.gunState = GunState.UNCHARGED;
+            if (targetValid) {
+                setLastPositon(livingentity.getEyePosition());
+            }
+            return;
+        }
+
+        if (this.gunState == GunState.UNCHARGED && gunController.hasAmmo()) {
+            this.gunState = GunState.CHARGED;
+            this.attackDelay = gunController.getReadyDelayAfterAmmoFound();
+            this.ammoCount = gunController.getAmmoCount();
+        }
+        if (this.gunState == GunState.CHARGED && !gunController.hasAmmo()) {
+            this.gunState = GunState.UNCHARGED;
+        }
+
+        switch (this.gunState) {
+            case UNCHARGED -> {
+                if (!flag2 && gunController.canReload() && !stunned) {
+                    gunController.startReload();
+                    this.gunState = GunState.CHARGING;
+                }
+            }
+            case CHARGING -> {
+                GunReloadResult reloadResult = gunController.tickReloading();
+                if (reloadResult == GunReloadResult.FAILED) {
+                    this.gunState = GunState.UNCHARGED;
+                } else if (reloadResult == GunReloadResult.RELOADED) {
+                    this.gunState = GunState.CHARGED;
+                    this.attackDelay = gunController.getReadyDelayAfterReload();
+                    this.ammoCount = gunController.getAmmoCount();
+                }
+            }
+            case CHARGED -> {
+                if (--this.attackDelay <= 0) {
+                    gunController.startAiming(livingentity);
+                    this.gunState = GunState.READY_TO_ATTACK;
+                    this.attackDelay = 0;
+                }
+            }
+            case READY_TO_ATTACK -> {
+                if (targetValid && (flag || stunned) && isRightAngle()) {
+                    GunShotResult shotResult = gunController.shoot(livingentity, stunned, getLastPositon(), this.ammoCount);
+                    this.ammoCount = shotResult.getAmmoCount();
+                    if (shotResult.isDepleted()) {
+                        this.gunState = GunState.UNCHARGED;
+                    } else if (shotResult.shouldCooldown()) {
+                        this.gunState = GunState.CHARGED;
+                        this.attackDelay = shotResult.getCooldownTicks();
+                    }
+                }
+            }
+        }
+
+        if (targetValid) {
+            setLastPositon(livingentity.getEyePosition());
+        }
+    }
+
+    private GunController controller() {
+        if (!this.controller.isValid()) {
+            this.controller = GunControllerFactory.create(this.mob);
+        }
+        return this.controller;
     }
 
     private boolean isValidTarget() {
         return this.mob.getTarget() != null && this.mob.getTarget().isAlive();
-    }
-
-    public boolean hasAmmo() {
-        return GunItem.isCharged(this.mob.getItemInHand(InteractionHand.MAIN_HAND));
     }
 
     private boolean isRightAngle() {
@@ -85,147 +229,6 @@ public class GunAttackGoal<T extends Mob> extends Goal {
             return vectorDegreeCalculate(this.mob.getViewVector(1), target.getEyePosition().subtract(this.mob.getEyePosition())) < 10 + Math.max(0, 64 - this.mob.distanceToSqr(target));
         }
         return false;
-
-    }
-
-    @Override
-    public void stop() {
-        super.stop();
-        this.mob.setAggressive(false);
-        this.mob.setTarget(null);
-        setLastPositon(null);
-        this.seeTime = 0;
-        if (this.mob.isUsingItem()) {
-            this.mob.stopUsingItem();
-//            this.mob.setChargingCrossbow(false);
-            GunItem.setCharged(this.mob.getUseItem(), false);
-        }
-        this.mob.getNavigation().stop();
-
-    }
-
-    @Override
-    public boolean requiresUpdateEveryTick() {
-        return true;
-    }
-
-    @Override
-    public void tick() {
-        LivingEntity livingentity = this.mob.getTarget();
-        boolean flag2 = false;
-        boolean flag = false;
-        double attackRadius = this.mob.getAttributeValue(Attributes.FOLLOW_RANGE);
-        boolean isStunned = isStunned(this.mob);
-        if (isValidTarget()) {
-            this.mob.setAggressive(true);
-            double d0 = livingentity.position().subtract(this.mob.position()).length();
-            flag = this.mob.getSensing().hasLineOfSight(livingentity) && !isStunned;
-            if (flag) {
-                ++this.seeTime;
-            } else {
-                this.seeTime = 0;
-            }
-            if (!isStunned) {
-                if (d0 <= attackRadius && this.seeTime > 5) {
-                    if (!hasAmmo()) {
-                        stopped = false;
-                        if (d0 < attackRadius / 2) {
-                            away = true;
-                            Vec3 vec3 = this.mob.position().add(this.mob.position().subtract(livingentity.position().x, this.mob.position().y, livingentity.position().z).normalize().scale(attackRadius / 2));
-                            this.mob.getNavigation().moveTo(vec3.x, vec3.y, vec3.z, this.speedModifier);
-                        }
-                        if (away && d0 > attackRadius * 2 / 3) {
-                            this.mob.getNavigation().stop();
-                            away = false;
-                        }
-                        else if (!away && d0 < attackRadius * 2 / 3) {
-                            this.mob.getNavigation().stop();
-                        }
-                    } else if (hasAmmo() && !stopped) {
-                        this.mob.getNavigation().stop();
-                        stopped = true;
-                    }
-                }else {
-                    stopped = false;
-                    this.mob.getNavigation().moveTo(livingentity, this.canRun() ? this.speedModifier : this.speedModifier * 0.5D);
-                }
-                this.mob.getLookControl().setLookAt(livingentity, 30.0F, 30.0F);
-
-            }
-
-            flag2 = (d0 > attackRadius || this.seeTime < 5) && this.attackDelay == 0;
-        }
-
-        if (this.gunState == GunAttackGoal.GunState.UNCHARGED && GunItem.isCharged(this.mob.getItemInHand(InteractionHand.MAIN_HAND))) {
-            this.gunState = GunAttackGoal.GunState.CHARGED;
-            this.attackDelay = 20 + this.mob.getRandom().nextInt(20);
-            ammoCount = GunItem.getCurrentAmmoCount(this.mob.getItemInHand(InteractionHand.MAIN_HAND));
-        }
-        if (this.gunState == GunAttackGoal.GunState.CHARGED && !GunItem.isCharged(this.mob.getItemInHand(InteractionHand.MAIN_HAND))){
-            this.gunState = GunAttackGoal.GunState.UNCHARGED;
-        }
-        switch (this.gunState) {
-            case UNCHARGED -> {
-                if (!flag2 && !isStunned) {
-                    this.mob.startUsingItem(ProjectileUtil.getWeaponHoldingHand(this.mob, item -> item instanceof GunItem));
-                    this.gunState = GunAttackGoal.GunState.CHARGING;
-                    if (this.mob instanceof CrossbowAttackMob crossbowAttackMob) {
-                        crossbowAttackMob.setChargingCrossbow(true);
-                    }
-                }
-            }
-            case CHARGING -> {
-                if (!this.mob.isUsingItem()) {
-                    this.gunState = GunAttackGoal.GunState.UNCHARGED;
-                }
-                int i = this.mob.getTicksUsingItem();
-                ItemStack itemstack = this.mob.getUseItem();
-                if (itemstack.getItem() instanceof GunItem gun && i >= GunItem.getChargeDuration(itemstack)) {
-                    this.mob.releaseUsingItem();
-                    this.gunState = GunAttackGoal.GunState.CHARGED;
-                    this.attackDelay = 10 + this.mob.getRandom().nextInt(20) + gun.getCooldownTime();
-                    ammoCount = GunItem.getCurrentAmmoCount(this.mob.getItemInHand(InteractionHand.MAIN_HAND));
-                    if (this.mob instanceof CrossbowAttackMob crossbowAttackMob) {
-                        crossbowAttackMob.setChargingCrossbow(false);
-                    }
-                }
-            }
-            case CHARGED -> {
-                if (--this.attackDelay <= 0) {
-                    this.gunState = GunAttackGoal.GunState.READY_TO_ATTACK;
-                }
-            }
-            case READY_TO_ATTACK -> {
-                if ((flag || isStunned) && isRightAngle())  {
-                    InteractionHand interactionhand = ProjectileUtil.getWeaponHoldingHand(this.mob, item -> item instanceof GunItem);
-                    ItemStack itemstack = this.mob.getItemInHand(interactionhand);
-                    if (itemstack.getItem() instanceof GunItem gunItem) {
-                        float inaccuracy = EventFactory.getModifiedInaccuracy(gunItem.getInaccuracy(livingentity), mob, livingentity, getLastPositon());
-                        if (isStunned) {
-                            inaccuracy += 8;
-                        }
-                        GunItem.performShooting(this.mob.level(), this.mob, interactionhand, itemstack, inaccuracy);
-                        ammoCount -= 1;
-                        ItemStack itemstack1 = this.mob.getItemInHand(ProjectileUtil.getWeaponHoldingHand(this.mob, item -> item instanceof GunItem));
-                        if (ammoCount <= 0) {
-                            GunItem.setCharged(itemstack1, false);
-                            this.gunState = GunAttackGoal.GunState.UNCHARGED;
-                        } else {
-                            this.gunState = GunAttackGoal.GunState.CHARGED;
-                            if (itemstack1.getItem() instanceof GunItem gun) {
-                                this.attackDelay = gun.getCooldownTime();
-                            }
-
-                        }
-                    }
-                }
-            }
-        }
-
-        if (isValidTarget()) {
-            setLastPositon(livingentity.getEyePosition());
-        }
-
     }
 
     private boolean canRun() {
@@ -255,7 +258,6 @@ public class GunAttackGoal<T extends Mob> extends Goal {
         UNCHARGED,
         CHARGING,
         CHARGED,
-        READY_TO_ATTACK;
+        READY_TO_ATTACK
     }
 }
-
