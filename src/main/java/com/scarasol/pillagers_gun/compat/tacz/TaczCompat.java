@@ -8,6 +8,7 @@ import com.scarasol.pillagers_gun.entity.goal.controller.EmptyGunController;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunController;
 import com.scarasol.pillagers_gun.event.EventHandler;
 import com.scarasol.pillagers_gun.init.PillagersGunItems;
+import com.scarasol.pillagers_gun.util.WeightedRandom;
 import com.tacz.guns.api.DefaultAssets;
 import com.tacz.guns.api.TimelessAPI;
 import com.tacz.guns.api.item.IGun;
@@ -23,6 +24,7 @@ import com.tacz.guns.sound.SoundManager;
 import com.tacz.guns.util.AttachmentDataUtils;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
@@ -35,9 +37,10 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.event.entity.living.LivingEquipmentChangeEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
+import java.util.Optional;
 
 public class TaczCompat {
 
@@ -51,6 +54,7 @@ public class TaczCompat {
     public static final Map<String, Double> GUN_INACCURACY = Maps.newHashMap();
     public static final Map<ResourceLocation, Double> SPAWN_GUN = Maps.newHashMap();
     public static double totalWeight = 0;
+    private static boolean spawnGunLoaded = false;
 
     static {
         Item item = ForgeRegistries.ITEMS.getValue(new ResourceLocation("tacz:modern_kinetic_gun"));
@@ -126,6 +130,18 @@ public class TaczCompat {
                 .orElse("");
     }
 
+    public static boolean isSameGun(ItemStack first, ItemStack second) {
+        if (first.isEmpty() || second.isEmpty() || !first.is(second.getItem())) {
+            return false;
+        }
+        IGun firstGun = IGun.getIGunOrNull(first);
+        IGun secondGun = IGun.getIGunOrNull(second);
+        if (firstGun == null || secondGun == null) {
+            return false;
+        }
+        return firstGun.getGunId(first).equals(secondGun.getGunId(second));
+    }
+
 
     public static double getInaccuracy(String type, double originalValue) {
         if (GUN_INACCURACY.isEmpty()) {
@@ -141,51 +157,77 @@ public class TaczCompat {
     }
 
     public static boolean spawnWithTaczGun(Mob mob) {
-        if (SPAWN_GUN.isEmpty()) {
-            for (String info : CommonConfig.TACZ_GUN_TYPE.get()) {
-                String[] gunType = info.trim().split(",");
-                if (gunType.length < 2) {
-                    continue;
-                }
-                totalWeight += Double.parseDouble(gunType[1]);
-                SPAWN_GUN.put(new ResourceLocation(gunType[0]), Double.parseDouble(gunType[1]));
-            }
+        loadSpawnGunConfig();
+        Optional<ResourceLocation> gunId = WeightedRandom.pick(mob.getRandom(), getSpawnGunEntries());
+        if (gunId.isEmpty()) {
+            return false;
         }
-        if (totalWeight > 0) {
-            Item item = ForgeRegistries.ITEMS.getValue(new ResourceLocation("tacz:modern_kinetic_gun"));
-            if (item instanceof IGun iGun) {
-                ItemStack itemStack = new ItemStack(item);
-                Random random = new Random();
-                double weight = random.nextDouble() * totalWeight;
-                for (Map.Entry<ResourceLocation, Double> entry : SPAWN_GUN.entrySet()) {
-                    if (weight <= entry.getValue()) {
-                        return TimelessAPI.getCommonGunIndex(entry.getKey()).map((commonGunIndex -> {
-                            iGun.setGunId(itemStack, entry.getKey());
-                            int maxAmmoCount = AttachmentDataUtils.getAmmoCountWithAttachment(itemStack, commonGunIndex.getGunData());
-                            iGun.setCurrentAmmoCount(itemStack, random.nextInt(0, maxAmmoCount));
-                            iGun.setFireMode(itemStack, commonGunIndex.getGunData().getFireModeSet().get(0));
-                            iGun.setBulletInBarrel(itemStack, true);
-                            if (CommonConfig.TACZ_GUNNERS_NEED_AMMO.get()) {
-                                if (iGun.useInventoryAmmo(itemStack)) {
-                                    iGun.setDummyAmmoAmount(itemStack, (int) (random.nextDouble(CommonConfig.GUARD_TACZ_GUN_MIN_AMMO.get(), CommonConfig.GUARD_TACZ_GUN_MAX_AMMO.get()) * 40));
-                                } else if (commonGunIndex.getGunData().getReloadData().getType() == FeedType.FUEL) {
-                                    iGun.setDummyAmmoAmount(itemStack, (int) (random.nextDouble(CommonConfig.GUARD_TACZ_GUN_MIN_AMMO.get(), CommonConfig.GUARD_TACZ_GUN_MAX_AMMO.get())));
-                                }else {
-                                    iGun.setDummyAmmoAmount(itemStack, (int) (random.nextDouble(CommonConfig.GUARD_TACZ_GUN_MIN_AMMO.get(), CommonConfig.GUARD_TACZ_GUN_MAX_AMMO.get()) * maxAmmoCount));
-                                }
-                            }
-                            mob.setItemInHand(InteractionHand.MAIN_HAND, itemStack);
-                            double dropChance = CommonConfig.DROP_CHANCE.get();
-                            mob.setDropChance(EquipmentSlot.MAINHAND, (float) dropChance);
-                            return true;
-                        })).orElse(false);
+
+        Item item = ForgeRegistries.ITEMS.getValue(new ResourceLocation("tacz:modern_kinetic_gun"));
+        if (item instanceof IGun iGun) {
+            ItemStack itemStack = new ItemStack(item);
+            return TimelessAPI.getCommonGunIndex(gunId.get()).map(commonGunIndex -> {
+                iGun.setGunId(itemStack, gunId.get());
+                int maxAmmoCount = AttachmentDataUtils.getAmmoCountWithAttachment(itemStack, commonGunIndex.getGunData());
+                iGun.setCurrentAmmoCount(itemStack, maxAmmoCount <= 0 ? 0 : mob.getRandom().nextInt(maxAmmoCount));
+                iGun.setFireMode(itemStack, commonGunIndex.getGunData().getFireModeSet().get(0));
+                iGun.setBulletInBarrel(itemStack, true);
+                if (CommonConfig.TACZ_GUNNERS_NEED_AMMO.get()) {
+                    double ammoMultiplier = nextDouble(mob.getRandom(), CommonConfig.GUARD_TACZ_GUN_MIN_AMMO.get(), CommonConfig.GUARD_TACZ_GUN_MAX_AMMO.get());
+                    if (iGun.useInventoryAmmo(itemStack)) {
+                        iGun.setDummyAmmoAmount(itemStack, (int) (ammoMultiplier * 40));
+                    } else if (commonGunIndex.getGunData().getReloadData().getType() == FeedType.FUEL) {
+                        iGun.setDummyAmmoAmount(itemStack, (int) ammoMultiplier);
+                    } else {
+                        iGun.setDummyAmmoAmount(itemStack, (int) (ammoMultiplier * maxAmmoCount));
                     }
-                    weight -= entry.getValue();
                 }
-            }
+                mob.setItemInHand(InteractionHand.MAIN_HAND, itemStack);
+                double dropChance = CommonConfig.DROP_CHANCE.get();
+                mob.setDropChance(EquipmentSlot.MAINHAND, (float) dropChance);
+                return true;
+            }).orElse(false);
         }
 
         return false;
+    }
+
+    private static void loadSpawnGunConfig() {
+        if (spawnGunLoaded) {
+            return;
+        }
+        spawnGunLoaded = true;
+        SPAWN_GUN.clear();
+        totalWeight = 0;
+        for (String info : CommonConfig.TACZ_GUN_TYPE.get()) {
+            String[] gunType = info.trim().split(",");
+            if (gunType.length < 2) {
+                continue;
+            }
+            try {
+                double weight = Double.parseDouble(gunType[1].trim());
+                if (weight > 0 && Double.isFinite(weight)) {
+                    ResourceLocation gunId = new ResourceLocation(gunType[0].trim());
+                    SPAWN_GUN.put(gunId, weight);
+                    totalWeight += weight;
+                }
+            } catch (RuntimeException ignored) {
+            }
+        }
+    }
+
+    private static List<WeightedRandom.Entry<ResourceLocation>> getSpawnGunEntries() {
+        List<WeightedRandom.Entry<ResourceLocation>> entries = new ArrayList<>();
+        for (Map.Entry<ResourceLocation, Double> entry : SPAWN_GUN.entrySet()) {
+            entries.add(WeightedRandom.entry(entry.getKey(), entry.getValue()));
+        }
+        return entries;
+    }
+
+    private static double nextDouble(RandomSource random, double min, double max) {
+        double lower = Math.min(min, max);
+        double upper = Math.max(min, max);
+        return lower + random.nextDouble() * (upper - lower);
     }
 
     public static boolean isSniperGun(ItemStack gunItem) {

@@ -4,6 +4,7 @@ import com.google.common.collect.Lists;
 import com.scarasol.pillagers_gun.PillagersGunMod;
 import com.scarasol.pillagers_gun.compat.sbw.SbwCompat;
 import com.scarasol.pillagers_gun.compat.tacz.TaczCompat;
+import com.scarasol.pillagers_gun.config.CommonConfig;
 import com.scarasol.pillagers_gun.entity.projectile.Ammo;
 import com.scarasol.pillagers_gun.item.ammo.AmmoItem;
 import net.minecraft.advancements.CriteriaTriggers;
@@ -259,7 +260,7 @@ public abstract class GunItem extends ProjectileWeaponItem implements Vanishable
     }
 
     public void playSound(ItemStack itemStack, LivingEntity livingEntity, Level level, float[] afloat) {
-        if (!(livingEntity instanceof Player)) {
+        if (!(livingEntity instanceof Player) && CommonConfig.GUN_MODEL.get()) {
             if (ModList.get().isLoaded("superbwarfare")) {
                 if (!ModList.get().isLoaded("tacz") || livingEntity.getId() % 2 == 0) {
                     SbwCompat.playSound(SbwCompat.itemStackSwitch(itemStack), livingEntity);

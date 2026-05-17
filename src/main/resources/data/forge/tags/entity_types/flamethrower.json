@@ -2,7 +2,7 @@
   "replace": false,
   "values": [
     {
-      "id": "#forge:pillager_gunner",
+      "id": "#forge:born_with_gun",
       "required": false
     }
   ]

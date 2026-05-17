@@ -1,6 +1,7 @@
 package com.scarasol.pillagers_gun.mixin.recruits;
 
 import com.scarasol.pillagers_gun.item.gun.GunItem;
+import com.scarasol.pillagers_gun.util.GunUtil;
 import com.talhanation.recruits.client.render.RecruitVillagerRenderer;
 import com.talhanation.recruits.entities.AbstractInventoryEntity;
 import com.talhanation.recruits.entities.AbstractRecruitEntity;
@@ -8,7 +9,7 @@ import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.world.InteractionHand;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -23,14 +24,13 @@ public abstract class RecruitVillagerRendererMixin extends MobRenderer<AbstractR
 
     @Inject(method = "getArmPose", at = @At("RETURN"), cancellable = true, remap = false)
     private static void OnGetArmPose(AbstractInventoryEntity recruit, InteractionHand hand, CallbackInfoReturnable<HumanoidModel.ArmPose> cir){
-        if ((recruit.getItemInHand(hand).getItem() instanceof GunItem) && !recruit.swinging) {
-            if (GunItem.isCharged(recruit.getItemInHand(hand))) {
+        ItemStack itemStack = recruit.getItemInHand(hand);
+        if (GunUtil.shouldUseGunPose(itemStack) && !recruit.swinging) {
+            if (!(itemStack.getItem() instanceof GunItem) || GunItem.isCharged(itemStack)) {
                 cir.setReturnValue(HumanoidModel.ArmPose.CROSSBOW_HOLD);
             } else if (recruit.isUsingItem()) {
                 cir.setReturnValue(HumanoidModel.ArmPose.CROSSBOW_CHARGE);
             }
-        }else if ("zombiekit:flamethrower".equals(ForgeRegistries.ITEMS.getKey(recruit.getItemInHand(hand).getItem()).toString())&& !recruit.swinging) {
-            cir.setReturnValue(HumanoidModel.ArmPose.CROSSBOW_HOLD);
         }
     }
 }

@@ -2,14 +2,19 @@ package com.scarasol.pillagers_gun.util;
 
 import com.scarasol.pillagers_gun.PillagersGunMod;
 import com.scarasol.pillagers_gun.api.IMob;
+import com.scarasol.pillagers_gun.compat.sbw.SbwCompat;
 import com.scarasol.pillagers_gun.compat.tacz.TaczCompat;
+import com.scarasol.pillagers_gun.config.CommonConfig;
 import com.scarasol.pillagers_gun.init.PillagersGunItems;
+import com.scarasol.pillagers_gun.item.gun.GunItem;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.fml.ModList;
+import net.minecraftforge.registries.ForgeRegistries;
 
 /**
  * @author Scarasol
@@ -29,10 +34,38 @@ public class GunUtil {
     private static final double DIST_EXP = 0.50D;
 
     public static boolean isSniperGun(ItemStack itemStack) {
-        if (ModList.get().isLoaded("tacz")) {
-            return itemStack.is(PillagersGunItems.SNIPERS_RIFLE.get()) || TaczCompat.isSniperGun(itemStack);
+        if (itemStack.is(PillagersGunItems.SNIPERS_RIFLE.get())) {
+            return true;
         }
-        return itemStack.is(PillagersGunItems.SNIPERS_RIFLE.get());
+        if (ModList.get().isLoaded("tacz") && TaczCompat.isSniperGun(itemStack)) {
+            return true;
+        }
+        return ModList.get().isLoaded("superbwarfare") && SbwCompat.isSniperGun(itemStack);
+    }
+
+    public static boolean shouldUseGunPose(ItemStack itemStack) {
+        if (itemStack.isEmpty()) {
+            return false;
+        }
+        if (itemStack.getItem() instanceof GunItem) {
+            return true;
+        }
+
+        ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(itemStack.getItem());
+        if (itemId == null) {
+            return false;
+        }
+        if ("zombiekit".equals(itemId.getNamespace()) && "flamethrower".equals(itemId.getPath())) {
+            return true;
+        }
+        if (ModList.get().isLoaded("tacz")
+                && CommonConfig.TACZ_GUN_USE.get()
+                && !TaczCompat.getGunType(itemStack).isEmpty()) {
+            return true;
+        }
+        return ModList.get().isLoaded("superbwarfare")
+                && CommonConfig.SBW_GUN_USE.get()
+                && SbwCompat.isSbwGun(itemStack);
     }
 
     /**

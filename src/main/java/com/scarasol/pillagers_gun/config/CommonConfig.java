@@ -67,6 +67,15 @@ public class CommonConfig {
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> TACZ_RENDER_LASER;
     public static final ForgeConfigSpec.ConfigValue<Boolean> GUARD_SPAWN_WITH_TACZ_GUN;
 
+    public static final ForgeConfigSpec.ConfigValue<Boolean> SBW_GUN_USE;
+    public static final ForgeConfigSpec.ConfigValue<Boolean> SBW_GUN_SPAWN;
+    public static final ForgeConfigSpec.ConfigValue<Boolean> SBW_GUNNERS_NEED_AMMO;
+    public static final ForgeConfigSpec.ConfigValue<Double> SBW_GUN_MIN_AMMO;
+    public static final ForgeConfigSpec.ConfigValue<Double> SBW_GUN_MAX_AMMO;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> SBW_GUN_TYPE;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> SBW_GUN_INACCURACY;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> SBW_RENDER_LASER;
+
 
     public static final ForgeConfigSpec.ConfigValue<Boolean> GUARD_SPAWN_WITH_GUN;
     public static final ForgeConfigSpec.ConfigValue<Double> GUARD_EQUIP_CHANCE;
@@ -212,6 +221,53 @@ public class CommonConfig {
         GUARD_SPAWN_WITH_TACZ_GUN = BUILDER.comment("Whether Guard or Recruit will spawn with gun in TACZ.")
                 .define("Villager Spawn With TACZ Gun", false);
         BUILDER.pop();
+        BUILDER.pop();
+
+        BUILDER.push("Compat - SBW");
+        SBW_GUN_USE = BUILDER.comment("Whether gunners are allowed to use Superb Warfare firearms.")
+                .define("SBW Compat", true);
+        SBW_GUN_SPAWN = BUILDER.comment("""
+                Whether gunners are allowed to spawn with Superb Warfare firearms.
+                WARNING: Spawning with Superb Warfare firearms will significantly increase the game's difficulty.
+                """).define("Spawn With SBW", false);
+        SBW_GUNNERS_NEED_AMMO = BUILDER.comment("""
+                Whether gunners consume ammo when using Superb Warfare firearms.
+                If disabled, SBW gunners use infinite backup ammo without adding spare ammo to dropped guns.
+                """)
+                .define("Gunner Needs Ammo In SBW", false);
+        SBW_GUN_MIN_AMMO = BUILDER.comment("""
+                If SBW gunners consume ammo, this sets the minimum number of magazines they will spawn with.
+                """).defineInRange("SBW Min Ammo", 3, 0, 100.0);
+        SBW_GUN_MAX_AMMO = BUILDER.comment("""
+                If SBW gunners consume ammo, this sets the maximum number of magazines they will spawn with.
+                """).defineInRange("SBW Max Ammo", 6, 0, 100.0);
+        SBW_GUN_TYPE = BUILDER.comment("""
+                Superb Warfare firearm item IDs and their weights for gunners upon spawning.
+                Format: "superbwarfare:m_1911, 5" means the M1911 has a spawn weight of 5.
+                """).defineList("SBW Gun Type", Lists.newArrayList(
+                "superbwarfare:m_1911, 0.5",
+                "superbwarfare:ak_47, 0.2",
+                "superbwarfare:m_870, 0.2",
+                "superbwarfare:m_98b, 0.05",
+                "superbwarfare:rpg, 0.05"
+        ), element -> true);
+        SBW_GUN_INACCURACY = BUILDER.comment("""
+                The inaccuracy values for different types of Superb Warfare firearms used by gunners.
+                The lower the value, the higher the shooting accuracy.
+                Format: "handgun, 2" means the inaccuracy value for handguns is 2.
+                """).defineList("SBW Gun Inaccuracy", Lists.newArrayList(
+                "handgun, 2",
+                "sniper, 0.15",
+                "rifle, 2",
+                "shotgun, 5",
+                "smg, 5",
+                "machinegun, 5",
+                "directlauncher, 5",
+                "curvedlauncher, 5",
+                "special, 2"
+        ), element -> true);
+        SBW_RENDER_LASER = BUILDER.comment("Superb Warfare gun types that cause mobs to render a laser when aiming at the player.")
+                .defineList("SBW Render Laser", Lists.newArrayList("sniper"), element -> true);
         BUILDER.pop();
 
         BUILDER.push("Compat - Guard Villager & Recruits");

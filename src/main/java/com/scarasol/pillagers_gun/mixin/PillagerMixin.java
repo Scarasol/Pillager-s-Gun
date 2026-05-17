@@ -1,6 +1,6 @@
 package com.scarasol.pillagers_gun.mixin;
 
-import com.scarasol.pillagers_gun.item.gun.GunItem;
+import com.scarasol.pillagers_gun.util.GunUtil;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.monster.AbstractIllager;
 import net.minecraft.world.entity.monster.CrossbowAttackMob;
@@ -23,7 +23,7 @@ public abstract class PillagerMixin extends AbstractIllager implements CrossbowA
 
     @Inject(method = "getArmPose", at = @At("RETURN"), cancellable = true)
     private void onGetArmPose(CallbackInfoReturnable<IllagerArmPose> cir){
-        if (this.isHolding(is -> is.getItem() instanceof GunItem)){
+        if (this.isHolding(GunUtil::shouldUseGunPose)){
             if (!this.isChargingCrossbow()) {
                 cir.setReturnValue(IllagerArmPose.CROSSBOW_HOLD);
             } else {

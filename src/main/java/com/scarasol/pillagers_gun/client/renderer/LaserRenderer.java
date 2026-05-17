@@ -4,12 +4,14 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import com.scarasol.pillagers_gun.PillagersGunMod;
+import com.scarasol.pillagers_gun.compat.sbw.SbwCompat;
 import com.scarasol.pillagers_gun.compat.tacz.TaczCompat;
 import com.scarasol.pillagers_gun.config.CommonConfig;
 import com.scarasol.pillagers_gun.init.PillagersGunItems;
 import com.scarasol.pillagers_gun.item.gun.GunItem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -88,10 +90,13 @@ public class LaserRenderer {
         }
         double value = attribute.getValue();
         ItemStack itemStack = entity.getMainHandItem();
+        ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(itemStack.getItem());
         if (itemStack.is(PillagersGunItems.SNIPERS_RIFLE.get())) {
             value *= (CommonConfig.SNIPERS_RIFLE_BONUS.get() + 1);
-        } else if ("tacz".equals(ForgeRegistries.ITEMS.getKey(itemStack.getItem()).getNamespace())) {
+        } else if (itemId != null && "tacz".equals(itemId.getNamespace())) {
             value *= TaczCompat.getZoomAttribute(itemStack);
+        } else if (itemId != null && "superbwarfare".equals(itemId.getNamespace()) && SbwCompat.isSniperGun(itemStack)) {
+            value *= (CommonConfig.SNIPERS_RIFLE_BONUS.get() + 1);
         }
         return value;
     }
@@ -100,8 +105,14 @@ public class LaserRenderer {
         Item item = itemStack.getItem();
         if (item instanceof GunItem gunItem) {
             return gunItem.shouldRenderLaser();
-        } else if ("tacz".equals(ForgeRegistries.ITEMS.getKey(item).getNamespace())) {
+        }
+        ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(item);
+        if (itemId == null) {
+            return false;
+        } else if ("tacz".equals(itemId.getNamespace())) {
             return TaczCompat.shouldRenderLaser(itemStack);
+        } else if ("superbwarfare".equals(itemId.getNamespace())) {
+            return SbwCompat.shouldRenderLaser(itemStack);
         }
         return false;
     }
