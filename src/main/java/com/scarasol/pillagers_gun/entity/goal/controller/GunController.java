@@ -40,8 +40,15 @@ public interface GunController {
     default void startAiming(LivingEntity target) {
     }
 
+    default void startAiming(Vec3 targetPosition) {
+    }
+
     default void stopAiming() {
     }
 
     GunShotResult shoot(LivingEntity target, boolean isStunned, Vec3 lastTargetPosition, int ammoCount);
+
+    default GunShotResult shootAt(Vec3 targetPosition, boolean isStunned, Vec3 lastTargetPosition, int ammoCount) {
+        return GunShotResult.noShot(ammoCount);
+    }
 }

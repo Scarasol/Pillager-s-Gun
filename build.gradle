@@ -144,7 +144,7 @@ dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     implementation fg.deobf("tallestegg.guardvillagers:guardvillagers-1.20.1-1.6.7:1.6.7")
-    implementation fg.deobf("com.talhanation.recruits:recruits-1.20.1-1.12.1:1.12.1")
+    implementation fg.deobf("curse.maven:recruits-523860:7906232")
     implementation fg.deobf("curse.maven:sona-survival-101-1023345:8086553-sources-8086573")
     implementation fg.deobf("curse.maven:zombie-survival-kit-839371:7241685")
     implementation fg.deobf('software.bernie.geckolib:geckolib-forge-1.20.1:4.4.9')
@@ -161,6 +161,10 @@ dependencies {
     compileOnly fg.deobf("curse.maven:tacz-unidict-1305429:7589418")
     implementation fg.deobf("curse.maven:oculus-581495:6020952")
     implementation fg.deobf("curse.maven:embeddium-908741:5681725")
+    compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.4.1"))
+    implementation(jarJar("io.github.llamalad7:mixinextras-forge:0.4.1")) {
+        jarJar.ranged(it, "[0.4.1,)")
+    }
 
     // Example mod dependency with JEI - using fg.deobf() ensures the dependency is remapped to your development mappings
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime

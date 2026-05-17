@@ -2,6 +2,7 @@ package com.scarasol.pillagers_gun.compat.tacz;
 
 import com.scarasol.pillagers_gun.config.CommonConfig;
 import com.scarasol.pillagers_gun.entity.goal.controller.DynamicFireRate;
+import com.scarasol.pillagers_gun.entity.goal.controller.GunAimUtil;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunController;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunReloadResult;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunShotResult;
@@ -158,6 +159,13 @@ public class TaczGunController implements GunController {
     }
 
     @Override
+    public void startAiming(Vec3 targetPosition) {
+        if (isValid()) {
+            IGunOperator.fromLivingEntity(this.mob).aim(true);
+        }
+    }
+
+    @Override
     public void stopAiming() {
         if (isValid()) {
             IGunOperator.fromLivingEntity(this.mob).aim(false);
@@ -166,18 +174,31 @@ public class TaczGunController implements GunController {
 
     @Override
     public GunShotResult shoot(LivingEntity target, boolean isStunned, Vec3 lastTargetPosition, int ammoCount) {
+        if (target == null) {
+            return GunShotResult.noShot(ammoCount);
+        }
+        return shootAtPosition(target.getEyePosition(), target.distanceTo(this.mob), isStunned, ammoCount);
+    }
+
+    @Override
+    public GunShotResult shootAt(Vec3 targetPosition, boolean isStunned, Vec3 lastTargetPosition, int ammoCount) {
+        return shootAtPosition(targetPosition, targetPosition.distanceTo(this.mob.getEyePosition()), isStunned, ammoCount);
+    }
+
+    private GunShotResult shootAtPosition(Vec3 targetPosition, double distance, boolean isStunned, int ammoCount) {
         IGun gun = getGun();
         ItemStack itemStack = this.mob.getMainHandItem();
         GunData gunData = gun == null ? null : getGunData(gun, itemStack);
-        if (gunData == null || target == null) {
+        if (gunData == null) {
             return GunShotResult.noShot(ammoCount);
         }
 
-        this.attackCount += DynamicFireRate.getStep(gun.getFireMode(itemStack) == FireMode.AUTO, gun.getRPM(itemStack), target.distanceTo(this.mob), isStunned);
+        this.attackCount += DynamicFireRate.getStep(gun.getFireMode(itemStack) == FireMode.AUTO, gun.getRPM(itemStack), distance, isStunned);
 
         int currentAmmo = ammoCount;
         for (; this.attackCount >= 1; this.attackCount--) {
             if (isValid()) {
+                GunAimUtil.lookAt(this.mob, targetPosition);
                 IGunOperator.fromLivingEntity(this.mob).shoot(this.mob::getXRot, this.mob::getYHeadRot);
 
                 if (gunData.getBolt() == Bolt.MANUAL_ACTION) {

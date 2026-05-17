@@ -3,11 +3,9 @@ package com.scarasol.pillagers_gun.client.renderer;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
-import com.scarasol.pillagers_gun.PillagersGunMod;
 import com.scarasol.pillagers_gun.compat.sbw.SbwCompat;
 import com.scarasol.pillagers_gun.compat.tacz.TaczCompat;
 import com.scarasol.pillagers_gun.config.CommonConfig;
-import com.scarasol.pillagers_gun.init.PillagersGunItems;
 import com.scarasol.pillagers_gun.item.gun.GunItem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -51,13 +49,14 @@ public class LaserRenderer {
         }
         double followRangeSqr = followRange * followRange;
 
-        if (entity.distanceToSqr(player) >= followRangeSqr) {
+        Vec3 eyePos = entity.getEyePosition(partialTicks);
+        Vec3 playerEyePos = player.getEyePosition(partialTicks);
+        if (eyePos.distanceToSqr(playerEyePos) >= followRangeSqr) {
             return;
         }
 
-        Vec3 eyePos = entity.getEyePosition(partialTicks);
         Vec3 viewDir = entity.getViewVector(partialTicks).normalize();
-        Vec3 toPlayer = player.getEyePosition(partialTicks).subtract(eyePos);
+        Vec3 toPlayer = playerEyePos.subtract(eyePos);
 
         if (toPlayer.lengthSqr() < 1.0E-6D) {
             return;
@@ -70,11 +69,14 @@ public class LaserRenderer {
             return;
         }
 
+        Vec3 renderOrigin = getInterpolatedPosition(entity, partialTicks);
         Vec3 startWorld = entity.getRopeHoldPosition(partialTicks);
-        Vec3 endWorld = getMinPosition(entity, followRange).add(0, -0.3, 0).yRot(-0.007f);
+        Vec3 laserDir = playerEyePos.subtract(startWorld).normalize();
+        Vec3 hitWorld = getMinPosition(entity, followRange, partialTicks, startWorld, laserDir, player);
+        Vec3 endWorld = startWorld.add(hitWorld.subtract(startWorld).add(0, -0.3, 0).yRot(-0.007f));
 
-        Vec3 startLocal = startWorld.subtract(entity.position());
-        Vec3 endLocal = endWorld.subtract(entity.position());
+        Vec3 startLocal = startWorld.subtract(renderOrigin);
+        Vec3 endLocal = endWorld.subtract(renderOrigin);
 
         renderLineBeam(poseStack, bufferSource,
                 startLocal, endLocal,
@@ -88,17 +90,7 @@ public class LaserRenderer {
         if (attribute == null) {
             return 0;
         }
-        double value = attribute.getValue();
-        ItemStack itemStack = entity.getMainHandItem();
-        ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(itemStack.getItem());
-        if (itemStack.is(PillagersGunItems.SNIPERS_RIFLE.get())) {
-            value *= (CommonConfig.SNIPERS_RIFLE_BONUS.get() + 1);
-        } else if (itemId != null && "tacz".equals(itemId.getNamespace())) {
-            value *= TaczCompat.getZoomAttribute(itemStack);
-        } else if (itemId != null && "superbwarfare".equals(itemId.getNamespace()) && SbwCompat.isSniperGun(itemStack)) {
-            value *= (CommonConfig.SNIPERS_RIFLE_BONUS.get() + 1);
-        }
-        return value;
+        return attribute.getValue();
     }
 
     public static boolean shouldRender(ItemStack itemStack) {
@@ -117,11 +109,9 @@ public class LaserRenderer {
         return false;
     }
 
-    public static Vec3 getMinPosition(LivingEntity entity, double distance) {
+    public static Vec3 getMinPosition(LivingEntity entity, double distance, float partialTicks, Vec3 eyePos, Vec3 viewDir, @Nullable Entity priorityTarget) {
         Level level = entity.level();
 
-        Vec3 eyePos = entity.getRopeHoldPosition(1);
-        Vec3 viewDir = entity.getViewVector(1.0F).normalize();
         Vec3 end = eyePos.add(viewDir.scale(distance));
 
         BlockHitResult blockHit = level.clip(new ClipContext(
@@ -139,12 +129,22 @@ public class LaserRenderer {
             blockDistSqr = blockHitPos.distanceToSqr(eyePos);
         }
 
-        AABB searchBox = entity.getBoundingBox()
-                .expandTowards(viewDir.scale(distance))
-                .inflate(1.0D);
+        double priorityDistSqr = Double.MAX_VALUE;
+        Vec3 priorityHitPos = null;
+        if (priorityTarget != null) {
+            Vec3 targetPos = priorityTarget.getEyePosition(partialTicks);
+            double dist = eyePos.distanceTo(targetPos) - (priorityTarget.getBoundingBox().getXsize() + priorityTarget.getBoundingBox().getZsize()) / 4;
+            if (dist > 0 && dist <= distance) {
+                priorityHitPos = eyePos.add(viewDir.scale(dist));
+                priorityDistSqr = dist * dist;
+            }
+        }
+
+        AABB searchBox = new AABB(eyePos, end).inflate(1.0D);
 
         Predicate<Entity> predicate = e ->
                 e != entity &&
+                        e != priorityTarget &&
                         !e.isSpectator() &&
                         e.isPickable();
 
@@ -163,7 +163,7 @@ public class LaserRenderer {
         if (entityHit != null) {
             Entity target = entityHit.getEntity();
 
-            Vec3 targetPos = target.getEyePosition();
+            Vec3 targetPos = target.getEyePosition(partialTicks);
             double dist = eyePos.distanceTo(targetPos) - (target.getBoundingBox().getXsize() + target.getBoundingBox().getZsize()) / 4;
 
             if (dist > distance) {
@@ -174,13 +174,23 @@ public class LaserRenderer {
             entityDistSqr = dist * dist;
         }
 
-        if (blockDistSqr == Double.MAX_VALUE && entityDistSqr == Double.MAX_VALUE) {
-            return end;
-        } else if (entityDistSqr < blockDistSqr) {
-            return entityHitPos;
-        } else {
-            return blockHitPos;
+        double hitDistSqr = blockDistSqr;
+        Vec3 hitPos = blockHitPos;
+        if (priorityDistSqr < hitDistSqr) {
+            hitDistSqr = priorityDistSqr;
+            hitPos = priorityHitPos;
         }
+        if (entityDistSqr < hitDistSqr) {
+            hitPos = entityHitPos;
+        }
+        return hitPos == null ? end : hitPos;
+    }
+
+    private static Vec3 getInterpolatedPosition(Entity entity, float partialTicks) {
+        double x = Mth.lerp(partialTicks, entity.xo, entity.getX());
+        double y = Mth.lerp(partialTicks, entity.yo, entity.getY());
+        double z = Mth.lerp(partialTicks, entity.zo, entity.getZ());
+        return new Vec3(x, y, z);
     }
 
 

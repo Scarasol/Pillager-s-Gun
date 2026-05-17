@@ -96,6 +96,18 @@ public class VanillaGunController implements GunController {
 
     @Override
     public GunShotResult shoot(LivingEntity target, boolean isStunned, Vec3 lastTargetPosition, int ammoCount) {
+        if (target == null) {
+            return GunShotResult.noShot(ammoCount);
+        }
+        return shootAtPosition(target.getEyePosition(), target.distanceTo(this.mob), isStunned, target, lastTargetPosition, ammoCount);
+    }
+
+    @Override
+    public GunShotResult shootAt(Vec3 targetPosition, boolean isStunned, Vec3 lastTargetPosition, int ammoCount) {
+        return shootAtPosition(targetPosition, targetPosition.distanceTo(this.mob.getEyePosition()), isStunned, null, lastTargetPosition, ammoCount);
+    }
+
+    private GunShotResult shootAtPosition(Vec3 targetPosition, double distance, boolean isStunned, LivingEntity target, Vec3 lastTargetPosition, int ammoCount) {
         InteractionHand hand = ProjectileUtil.getWeaponHoldingHand(this.mob, item -> item instanceof GunItem);
         ItemStack itemStack = this.mob.getItemInHand(hand);
         if (!(itemStack.getItem() instanceof GunItem gunItem)) {
@@ -105,13 +117,14 @@ public class VanillaGunController implements GunController {
         boolean automatic = isAutomatic(gunItem);
         if (!automatic) {
             double rpm = DynamicFireRate.cooldownTicksToRpm(gunItem.getCooldownTime());
-            this.attackCount += DynamicFireRate.getSemiAutoStep(rpm, target.distanceTo(this.mob), isStunned);
+            this.attackCount += DynamicFireRate.getSemiAutoStep(rpm, distance, isStunned);
             if (this.attackCount < 1) {
                 return GunShotResult.ready(ammoCount);
             }
             this.attackCount -= 1;
         }
 
+        GunAimUtil.lookAt(this.mob, targetPosition);
         float inaccuracy = EventFactory.getModifiedInaccuracy(gunItem.getInaccuracy(target), this.mob, target, lastTargetPosition);
         if (isStunned) {
             inaccuracy += 8;

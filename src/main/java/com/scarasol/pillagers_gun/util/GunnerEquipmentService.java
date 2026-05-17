@@ -219,9 +219,16 @@ public final class GunnerEquipmentService {
     }
 
     private static void applyFollowRangeForSelectedWeapon(LivingEntity entity, ItemStack itemStack) {
-        if (itemStack.is(PillagersGunItems.SNIPERS_RIFLE.get())
-                || ModList.get().isLoaded("superbwarfare") && SbwCompat.isSniperGun(itemStack)) {
+        if (itemStack.is(PillagersGunItems.SNIPERS_RIFLE.get())) {
             applySniperFollowRange(entity);
+        } else if (ModList.get().isLoaded("tacz")
+                && CommonConfig.TACZ_GUN_USE.get()
+                && isTaczStack(itemStack)) {
+            TaczCompat.zoomAttributeModifier(itemStack, entity);
+        } else if (ModList.get().isLoaded("superbwarfare")
+                && CommonConfig.SBW_GUN_USE.get()
+                && SbwCompat.isSbwGun(itemStack)) {
+            SbwCompat.zoomAttributeModifier(itemStack, entity);
         }
     }
 

@@ -8,6 +8,7 @@ import com.google.common.collect.Maps;
 import com.scarasol.pillagers_gun.config.CommonConfig;
 import com.scarasol.pillagers_gun.entity.goal.controller.EmptyGunController;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunController;
+import com.scarasol.pillagers_gun.event.EventHandler;
 import com.scarasol.pillagers_gun.init.PillagersGunItems;
 import com.scarasol.pillagers_gun.util.WeightedRandom;
 
@@ -17,8 +18,12 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.event.entity.living.LivingEquipmentChangeEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.ArrayList;
@@ -59,6 +64,35 @@ public class SbwCompat {
 
     public static ItemStack itemStackSwitch(ItemStack itemStack) {
         return GUN_SWITCH.getOrDefault(itemStack.getItem(), itemStack);
+    }
+
+    public static void changeEquipmentTo(LivingEquipmentChangeEvent event) {
+        zoomAttributeModifier(event.getTo(), event.getEntity());
+    }
+
+    public static double getZoomAttribute(ItemStack itemStack) {
+        if (!isSbwGun(itemStack)) {
+            return 0;
+        }
+        try {
+            return GunData.from(itemStack).zoom() / 2.0D - 1.0D;
+        } catch (RuntimeException | LinkageError ignored) {
+            return 0;
+        }
+    }
+
+    public static void zoomAttributeModifier(ItemStack itemStack, LivingEntity shooter) {
+        AttributeInstance attributeInstance = shooter.getAttributes().getInstance(Attributes.FOLLOW_RANGE);
+        if (attributeInstance == null) {
+            return;
+        }
+        attributeInstance.removeModifier(EventHandler.ATTRIBUTE_MODIFIER_UUID);
+
+        double aimingZoom = getZoomAttribute(itemStack);
+        if (aimingZoom > 0) {
+            AttributeModifier attributeModifier = new AttributeModifier(EventHandler.ATTRIBUTE_MODIFIER_UUID, "sbw", aimingZoom, AttributeModifier.Operation.MULTIPLY_BASE);
+            attributeInstance.addPermanentModifier(attributeModifier);
+        }
     }
 
     public static boolean spawnWithSbwGun(Mob mob) {

@@ -7,6 +7,7 @@ import com.atsuishio.superbwarfare.data.gun.GunProp;
 import com.atsuishio.superbwarfare.data.gun.ShootParameters;
 import com.atsuishio.superbwarfare.item.gun.GunItem;
 import com.scarasol.pillagers_gun.entity.goal.controller.DynamicFireRate;
+import com.scarasol.pillagers_gun.entity.goal.controller.GunAimUtil;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunController;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunReloadResult;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunShotResult;
@@ -116,6 +117,14 @@ public class SbwGunController implements GunController {
     }
 
     @Override
+    public void startAiming(Vec3 targetPosition) {
+        GunData data = tickGunData();
+        if (data != null) {
+            data.zooming.set(true);
+        }
+    }
+
+    @Override
     public void stopAiming() {
         GunData data = tickGunData();
         if (data != null) {
@@ -125,15 +134,26 @@ public class SbwGunController implements GunController {
 
     @Override
     public GunShotResult shoot(LivingEntity target, boolean isStunned, Vec3 lastTargetPosition, int ammoCount) {
+        if (target == null) {
+            return GunShotResult.noShot(ammoCount);
+        }
+        return shootAtPosition(target.getEyePosition(), target.distanceTo(this.mob), target, target.getUUID(), isStunned, lastTargetPosition, ammoCount);
+    }
+
+    @Override
+    public GunShotResult shootAt(Vec3 targetPosition, boolean isStunned, Vec3 lastTargetPosition, int ammoCount) {
+        return shootAtPosition(targetPosition, targetPosition.distanceTo(this.mob.getEyePosition()), null, null, isStunned, lastTargetPosition, ammoCount);
+    }
+
+    private GunShotResult shootAtPosition(Vec3 targetPosition, double distance, LivingEntity target, java.util.UUID targetEntityUUID, boolean isStunned, Vec3 lastTargetPosition, int ammoCount) {
         GunData data = tickGunData();
-        if (data == null || target == null) {
+        if (data == null) {
             return GunShotResult.noShot(ammoCount);
         }
 
         FireMode fireMode = getFireMode(data);
         boolean automatic = fireMode == FireMode.AUTO;
         int rpm = Math.max(1, getInt(data, GunProp.RPM));
-        double distance = target.distanceTo(this.mob);
         this.attackCount += automatic
                 ? DynamicFireRate.getStep(true, rpm, distance, isStunned)
                 : DynamicFireRate.getSemiAutoStep(rpm, distance, isStunned);
@@ -150,7 +170,7 @@ public class SbwGunController implements GunController {
             if (isStunned) {
                 spread += 8;
             }
-            shootAtTarget(data, target, spread, !isStunned);
+            shootAtPosition(data, targetPosition, targetEntityUUID, spread, !isStunned);
             if (data.shouldStartBolt()) {
                 data.startBolt();
             }
@@ -170,18 +190,18 @@ public class SbwGunController implements GunController {
         return GunShotResult.ready(currentAmmo);
     }
 
-    private void shootAtTarget(GunData data, LivingEntity target, double spread, boolean zoom) {
+    private void shootAtPosition(GunData data, Vec3 targetPosition, java.util.UUID targetEntityUUID, double spread, boolean zoom) {
         if (!(this.mob.level() instanceof ServerLevel serverLevel)) {
             return;
         }
         Vec3 shootPosition = new Vec3(this.mob.getX(), this.mob.getEyeY(), this.mob.getZ());
-        Vec3 targetPosition = target.getEyePosition();
         Vec3 shootDirection = targetPosition.subtract(shootPosition);
         if (shootDirection.lengthSqr() < 1.0E-6D) {
             shootDirection = this.mob.getLookAngle();
         } else {
             shootDirection = shootDirection.normalize();
         }
+        GunAimUtil.lookAt(this.mob, targetPosition);
         data.shoot(new ShootParameters(
                 this.mob,
                 this.mob,
@@ -191,7 +211,7 @@ public class SbwGunController implements GunController {
                 data,
                 spread,
                 zoom,
-                target.getUUID(),
+                targetEntityUUID,
                 targetPosition
         ));
     }

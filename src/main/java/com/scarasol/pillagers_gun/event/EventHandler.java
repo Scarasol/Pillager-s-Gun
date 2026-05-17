@@ -3,6 +3,7 @@ package com.scarasol.pillagers_gun.event;
 
 import com.scarasol.pillagers_gun.compat.sbw.SbwCompat;
 import com.scarasol.pillagers_gun.compat.tacz.TaczCompat;
+import com.scarasol.pillagers_gun.compat.recruits.RecruitCompat;
 import com.scarasol.pillagers_gun.config.CommonConfig;
 import com.scarasol.pillagers_gun.entity.goal.GunAttackGoal;
 import com.scarasol.pillagers_gun.event.server.InaccuracyEvent;
@@ -18,6 +19,7 @@ import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.living.LivingEquipmentChangeEvent;
 import net.minecraftforge.event.entity.living.LivingKnockBackEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
 
@@ -38,6 +40,9 @@ public class EventHandler {
             return;
         }
         if (entity.getType().is(PILLAGER_GUNNER) && entity instanceof Mob mob) {
+            if (ModList.get().isLoaded("recruits")) {
+                RecruitCompat.addGunGoals(mob);
+            }
             mob.goalSelector.addGoal(1, new GunAttackGoal<>(mob, 1.0D, 64.0F));
             mob.setLeftHanded(false);
         }
@@ -69,8 +74,8 @@ public class EventHandler {
             } else if (CommonConfig.SBW_GUN_USE.get()
                     && itemId != null
                     && "superbwarfare".equals(itemId.getNamespace())
-                    && SbwCompat.isSniperGun(event.getTo())) {
-                GunnerEquipmentService.applySniperFollowRange(mob);
+                    && SbwCompat.isSbwGun(event.getTo())) {
+                SbwCompat.changeEquipmentTo(event);
             } else {
                 GunnerEquipmentService.clearFollowRangeModifier(mob);
             }

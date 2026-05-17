@@ -1,6 +1,7 @@
 package com.scarasol.pillagers_gun.entity.goal;
 
 import com.scarasol.pillagers_gun.api.IMob;
+import com.scarasol.pillagers_gun.compat.recruits.RecruitCompat;
 import com.scarasol.pillagers_gun.entity.goal.controller.EmptyGunController;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunController;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunControllerFactory;
@@ -14,6 +15,7 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraftforge.fml.ModList;
 
 import javax.annotation.Nullable;
 import java.util.EnumSet;
@@ -49,13 +51,17 @@ public class GunAttackGoal<T extends Mob> extends Goal {
     @Override
     public boolean canUse() {
         GunController gunController = controller();
-        return gunController.isValid() && (this.isValidTarget() || (!gunController.hasAmmo() && gunController.canReload()) || isStunned(this.mob));
+        return canUseRegularGunAttack()
+                && gunController.isValid()
+                && (this.isValidTarget() || (!gunController.hasAmmo() && gunController.canReload()) || isStunned(this.mob));
     }
 
     @Override
     public boolean canContinueToUse() {
         GunController gunController = controller();
-        return gunController.isValid() && (this.isValidTarget() || (!gunController.hasAmmo() && gunController.canReload()) || isStunned(this.mob));
+        return canUseRegularGunAttack()
+                && gunController.isValid()
+                && (this.isValidTarget() || (!gunController.hasAmmo() && gunController.canReload()) || isStunned(this.mob));
     }
 
     @Override
@@ -218,6 +224,10 @@ public class GunAttackGoal<T extends Mob> extends Goal {
 
     private boolean isValidTarget() {
         return this.mob.getTarget() != null && this.mob.getTarget().isAlive();
+    }
+
+    private boolean canUseRegularGunAttack() {
+        return !ModList.get().isLoaded("recruits") || RecruitCompat.canUseRegularGunAttack(this.mob);
     }
 
     private boolean isRightAngle() {

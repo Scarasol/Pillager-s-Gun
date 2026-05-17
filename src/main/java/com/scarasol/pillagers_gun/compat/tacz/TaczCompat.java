@@ -2,27 +2,18 @@ package com.scarasol.pillagers_gun.compat.tacz;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.scarasol.pillagers_gun.PillagersGunMod;
 import com.scarasol.pillagers_gun.config.CommonConfig;
 import com.scarasol.pillagers_gun.entity.goal.controller.EmptyGunController;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunController;
 import com.scarasol.pillagers_gun.event.EventHandler;
 import com.scarasol.pillagers_gun.init.PillagersGunItems;
 import com.scarasol.pillagers_gun.util.WeightedRandom;
-import com.tacz.guns.api.DefaultAssets;
 import com.tacz.guns.api.TimelessAPI;
 import com.tacz.guns.api.item.IGun;
-import com.tacz.guns.api.item.attachment.AttachmentType;
-import com.tacz.guns.api.item.builder.GunItemBuilder;
-import com.tacz.guns.api.item.nbt.AttachmentItemDataAccessor;
-import com.tacz.guns.client.resource.GunDisplayInstance;
-import com.tacz.guns.client.resource.index.ClientAttachmentIndex;
-import com.tacz.guns.item.ModernKineticGunItem;
 import com.tacz.guns.resource.index.CommonGunIndex;
 import com.tacz.guns.resource.pojo.data.gun.FeedType;
 import com.tacz.guns.sound.SoundManager;
 import com.tacz.guns.util.AttachmentDataUtils;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
@@ -94,29 +85,27 @@ public class TaczCompat {
 
     public static double getZoomAttribute(ItemStack itemStack) {
         IGun gun = IGun.getIGunOrNull(itemStack);
-        if (gun != null) {
-            return gun.getAimingZoom(itemStack) / 2f - 1;
+        if (gun == null) {
+            return 0;
         }
-        return 0;
+        try {
+            return gun.getAimingZoom(itemStack) / 2f - 1;
+        } catch (RuntimeException | LinkageError ignored) {
+            return 0;
+        }
     }
 
     public static void zoomAttributeModifier(ItemStack itemStack, LivingEntity shooter) {
-        IGun gun = IGun.getIGunOrNull(itemStack);
-        if (gun != null) {
-            float aimingZoom;
-            try {
-                aimingZoom = gun.getAimingZoom(itemStack) / 2f - 1;
-            } catch (NoSuchMethodError e) {
-                aimingZoom = 0;
-            }
-            AttributeInstance attributeInstance = shooter.getAttributes().getInstance(Attributes.FOLLOW_RANGE);
-            if (attributeInstance != null) {
-                attributeInstance.removeModifier(EventHandler.ATTRIBUTE_MODIFIER_UUID);
-                if (aimingZoom > 0) {
-                    AttributeModifier attributeModifier = new AttributeModifier(EventHandler.ATTRIBUTE_MODIFIER_UUID, "tacz", aimingZoom, AttributeModifier.Operation.MULTIPLY_BASE);
-                    attributeInstance.addPermanentModifier(attributeModifier);
-                }
-            }
+        AttributeInstance attributeInstance = shooter.getAttributes().getInstance(Attributes.FOLLOW_RANGE);
+        if (attributeInstance == null) {
+            return;
+        }
+        attributeInstance.removeModifier(EventHandler.ATTRIBUTE_MODIFIER_UUID);
+
+        double aimingZoom = getZoomAttribute(itemStack);
+        if (aimingZoom > 0) {
+            AttributeModifier attributeModifier = new AttributeModifier(EventHandler.ATTRIBUTE_MODIFIER_UUID, "tacz", aimingZoom, AttributeModifier.Operation.MULTIPLY_BASE);
+            attributeInstance.addPermanentModifier(attributeModifier);
         }
     }
 
