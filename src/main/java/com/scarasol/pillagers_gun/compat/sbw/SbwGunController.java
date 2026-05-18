@@ -9,6 +9,7 @@ import com.atsuishio.superbwarfare.item.gun.GunItem;
 import com.scarasol.pillagers_gun.entity.goal.controller.DynamicFireRate;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunAimUtil;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunController;
+import com.scarasol.pillagers_gun.entity.goal.controller.GunRole;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunReloadResult;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunShotResult;
 import com.scarasol.pillagers_gun.event.EventFactory;
@@ -18,6 +19,8 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.monster.CrossbowAttackMob;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
+
+import java.util.Locale;
 
 public class SbwGunController implements GunController {
     private final Mob mob;
@@ -70,6 +73,49 @@ public class SbwGunController implements GunController {
         }
         int ammoCount = data.currentAvailableShots(this.mob);
         return ammoCount == Integer.MAX_VALUE ? -1 : ammoCount;
+    }
+
+    @Override
+    public int getMaxAmmoCount() {
+        GunData data = tickGunData();
+        if (data == null || data.useBackpackAmmo()) {
+            return -1;
+        }
+        return Math.max(0, getInt(data, GunProp.MAGAZINE));
+    }
+
+    @Override
+    public GunRole getRole() {
+        String gunType = SbwCompat.getGunType(this.mob.getMainHandItem()).toLowerCase(Locale.ROOT);
+        return switch (gunType) {
+            case "rifle", "smg", "machinegun" -> GunRole.RIFLE;
+            case "shotgun" -> GunRole.SHOTGUN;
+            case "handgun", "pistol" -> GunRole.PISTOL;
+            case "sniper" -> GunRole.SNIPER;
+            case "directlauncher", "curvedlauncher", "launcher" -> GunRole.EXPLOSIVE;
+            default -> GunRole.OTHER;
+        };
+    }
+
+    @Override
+    public double getAmmoUsePerTick(double distanceToTarget) {
+        GunData data = tickGunData();
+        if (data == null) {
+            return GunController.super.getAmmoUsePerTick(distanceToTarget);
+        }
+        FireMode fireMode = getFireMode(data);
+        int rpm = Math.max(1, getInt(data, GunProp.RPM));
+        return DynamicFireRate.getStep(fireMode == FireMode.AUTO, rpm, distanceToTarget, false);
+    }
+
+    @Override
+    public int getReloadDurationTicks() {
+        GunData data = tickGunData();
+        if (data == null) {
+            return GunController.super.getReloadDurationTicks();
+        }
+        int reloadMillis = getInt(data, getAmmoCount(data) > 0 ? GunProp.NORMAL_RELOAD_TIME : GunProp.EMPTY_RELOAD_TIME);
+        return Math.max(1, Math.round(reloadMillis / 50.0F));
     }
 
     @Override

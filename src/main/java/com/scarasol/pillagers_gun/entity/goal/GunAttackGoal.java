@@ -2,6 +2,13 @@ package com.scarasol.pillagers_gun.entity.goal;
 
 import com.scarasol.pillagers_gun.api.IMob;
 import com.scarasol.pillagers_gun.compat.recruits.RecruitCompat;
+import com.scarasol.pillagers_gun.config.CommonConfig;
+import com.scarasol.pillagers_gun.entity.goal.combat.CombatAction;
+import com.scarasol.pillagers_gun.entity.goal.combat.CombatContext;
+import com.scarasol.pillagers_gun.entity.goal.combat.CombatDirector;
+import com.scarasol.pillagers_gun.entity.goal.combat.CombatIntent;
+import com.scarasol.pillagers_gun.entity.goal.combat.CrossFireDirector;
+import com.scarasol.pillagers_gun.entity.goal.combat.NoTacticsDirector;
 import com.scarasol.pillagers_gun.entity.goal.controller.EmptyGunController;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunController;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunControllerFactory;
@@ -45,7 +52,7 @@ public class GunAttackGoal<T extends Mob> extends Goal {
     }
 
     public static boolean isStunned(LivingEntity mob) {
-        return mob.hasEffect(CONFUSION) || mob.hasEffect(BLIND);
+        return mob != null && ((CONFUSION != null && mob.hasEffect(CONFUSION)) || (BLIND != null && mob.hasEffect(BLIND)));
     }
 
     @Override
@@ -109,11 +116,12 @@ public class GunAttackGoal<T extends Mob> extends Goal {
         boolean flag2 = false;
         boolean flag = false;
         double attackRadius = this.mob.getAttributeValue(Attributes.FOLLOW_RANGE);
+        double distanceToTarget = 0.0D;
         boolean stunned = isStunned(this.mob);
 
         if (targetValid) {
             this.mob.setAggressive(true);
-            double d0 = livingentity.position().subtract(this.mob.position()).length();
+            distanceToTarget = livingentity.position().subtract(this.mob.position()).length();
             flag = this.mob.getSensing().hasLineOfSight(livingentity) && !stunned;
             if (flag) {
                 ++this.seeTime;
@@ -122,18 +130,18 @@ public class GunAttackGoal<T extends Mob> extends Goal {
             }
 
             if (!stunned) {
-                if (d0 <= attackRadius && this.seeTime > 5) {
-                    if (!gunController.hasAmmo()) {
+                if (distanceToTarget <= attackRadius && this.seeTime > 5) {
+                    if (!gunController.hasAmmo() || this.gunState == GunState.CHARGING) {
                         this.stopped = false;
-                        if (d0 < attackRadius / 2) {
+                        if (distanceToTarget < attackRadius / 2) {
                             this.away = true;
                             Vec3 vec3 = this.mob.position().add(this.mob.position().subtract(livingentity.position().x, this.mob.position().y, livingentity.position().z).normalize().scale(attackRadius / 2));
                             this.mob.getNavigation().moveTo(vec3.x, vec3.y, vec3.z, this.speedModifier);
                         }
-                        if (this.away && d0 > attackRadius * 2 / 3) {
+                        if (this.away && distanceToTarget > attackRadius * 2 / 3) {
                             this.mob.getNavigation().stop();
                             this.away = false;
-                        } else if (!this.away && d0 < attackRadius * 2 / 3) {
+                        } else if (!this.away && distanceToTarget < attackRadius * 2 / 3) {
                             this.mob.getNavigation().stop();
                         }
                     } else if (!this.stopped) {
@@ -146,7 +154,7 @@ public class GunAttackGoal<T extends Mob> extends Goal {
                 }
                 this.mob.getLookControl().setLookAt(livingentity, 30.0F, 30.0F);
             }
-            flag2 = (d0 > attackRadius || this.seeTime < 5) && this.attackDelay == 0;
+            flag2 = (distanceToTarget > attackRadius || this.seeTime < 5) && this.attackDelay == 0;
         }
 
         if (targetValid && gunController.canMeleeAttack(livingentity)) {
@@ -172,11 +180,14 @@ public class GunAttackGoal<T extends Mob> extends Goal {
             this.gunState = GunState.UNCHARGED;
         }
 
+        CombatContext combatContext = createCombatContext(gunController, livingentity, targetValid, flag, stunned, flag2, distanceToTarget, attackRadius);
+        CombatDirector combatDirector = combatDirector();
+        CombatIntent combatIntent = combatDirector.selectIntent(combatContext);
+
         switch (this.gunState) {
             case UNCHARGED -> {
-                if (!flag2 && gunController.canReload() && !stunned) {
-                    gunController.startReload();
-                    this.gunState = GunState.CHARGING;
+                if (combatIntent.action() == CombatAction.RELOAD) {
+                    startReloading(gunController);
                 }
             }
             case CHARGING -> {
@@ -190,14 +201,18 @@ public class GunAttackGoal<T extends Mob> extends Goal {
                 }
             }
             case CHARGED -> {
-                if (--this.attackDelay <= 0) {
+                if (combatIntent.action() == CombatAction.RELOAD) {
+                    startReloading(gunController);
+                } else if (--this.attackDelay <= 0) {
                     gunController.startAiming(livingentity);
                     this.gunState = GunState.READY_TO_ATTACK;
                     this.attackDelay = 0;
                 }
             }
             case READY_TO_ATTACK -> {
-                if (targetValid && (flag || stunned) && isRightAngle()) {
+                if (combatIntent.action() == CombatAction.RELOAD) {
+                    startReloading(gunController);
+                } else if (combatIntent.action() != CombatAction.HOLD_FIRE && targetValid && (flag || stunned) && isRightAngle()) {
                     GunShotResult shotResult = gunController.shoot(livingentity, stunned, getLastPositon(), this.ammoCount);
                     this.ammoCount = shotResult.getAmmoCount();
                     if (shotResult.isDepleted()) {
@@ -213,6 +228,44 @@ public class GunAttackGoal<T extends Mob> extends Goal {
         if (targetValid) {
             setLastPositon(livingentity.getEyePosition());
         }
+    }
+
+    private CombatDirector combatDirector() {
+        return CommonConfig.ENABLE_CROSS_FIRE.get() ? CrossFireDirector.INSTANCE : NoTacticsDirector.INSTANCE;
+    }
+
+    private CombatContext createCombatContext(GunController gunController,
+                                              LivingEntity target,
+                                              boolean targetValid,
+                                              boolean hasLineOfSight,
+                                              boolean stunned,
+                                              boolean delayReloadForPositioning,
+                                              double distanceToTarget,
+                                              double attackRadius) {
+        return new CombatContext(
+                this.mob,
+                target,
+                gunController,
+                this.gunState,
+                targetValid,
+                hasLineOfSight,
+                stunned,
+                delayReloadForPositioning,
+                distanceToTarget,
+                attackRadius,
+                this.seeTime,
+                this.attackDelay,
+                this.ammoCount,
+                this.mob.level().getGameTime()
+        );
+    }
+
+    private void startReloading(GunController gunController) {
+        gunController.stopAiming();
+        gunController.startReload();
+        this.gunState = GunState.CHARGING;
+        this.attackDelay = 0;
+        this.ammoCount = gunController.getAmmoCount();
     }
 
     private GunController controller() {
@@ -264,7 +317,7 @@ public class GunAttackGoal<T extends Mob> extends Goal {
         }
     }
 
-    enum GunState {
+    public enum GunState {
         UNCHARGED,
         CHARGING,
         CHARGED,

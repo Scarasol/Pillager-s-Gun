@@ -368,6 +368,12 @@ public abstract class GunItem extends ProjectileWeaponItem implements Vanishable
         compoundtag.putBoolean("Charged", charged);
     }
 
+    public static void discardLoadedAmmo(ItemStack itemStack) {
+        itemStack.getOrCreateTag().putInt("ammo", 0);
+        setCharged(itemStack, false);
+        clearChargedProjectiles(itemStack);
+    }
+
     @Override
     public int getDefaultProjectileRange() {
         return 8;

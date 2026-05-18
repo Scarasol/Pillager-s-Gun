@@ -1,7 +1,12 @@
 package com.scarasol.pillagers_gun.entity.goal.controller;
 
 import com.scarasol.pillagers_gun.event.EventFactory;
+import com.scarasol.pillagers_gun.item.gun.AssaultRifleItem;
+import com.scarasol.pillagers_gun.item.gun.BazookaItem;
 import com.scarasol.pillagers_gun.item.gun.GunItem;
+import com.scarasol.pillagers_gun.item.gun.PistolItem;
+import com.scarasol.pillagers_gun.item.gun.ShotgunItem;
+import com.scarasol.pillagers_gun.item.gun.SnipersRifleItem;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -55,6 +60,52 @@ public class VanillaGunController implements GunController {
     }
 
     @Override
+    public int getMaxAmmoCount() {
+        ItemStack itemStack = this.mob.getMainHandItem();
+        if (itemStack.getItem() instanceof GunItem gunItem) {
+            return gunItem.getAmmoCount();
+        }
+        return 0;
+    }
+
+    @Override
+    public GunRole getRole() {
+        ItemStack itemStack = this.mob.getMainHandItem();
+        if (itemStack.getItem() instanceof AssaultRifleItem) {
+            return GunRole.RIFLE;
+        }
+        if (itemStack.getItem() instanceof ShotgunItem) {
+            return GunRole.SHOTGUN;
+        }
+        if (itemStack.getItem() instanceof PistolItem) {
+            return GunRole.PISTOL;
+        }
+        if (itemStack.getItem() instanceof SnipersRifleItem) {
+            return GunRole.SNIPER;
+        }
+        if (itemStack.getItem() instanceof BazookaItem) {
+            return GunRole.EXPLOSIVE;
+        }
+        return GunRole.OTHER;
+    }
+
+    @Override
+    public double getAmmoUsePerTick(double distanceToTarget) {
+        ItemStack itemStack = this.mob.getMainHandItem();
+        if (itemStack.getItem() instanceof GunItem gunItem) {
+            double rpm = DynamicFireRate.cooldownTicksToRpm(gunItem.getCooldownTime());
+            return DynamicFireRate.getStep(isAutomatic(gunItem), rpm, distanceToTarget, false);
+        }
+        return GunController.super.getAmmoUsePerTick(distanceToTarget);
+    }
+
+    @Override
+    public int getReloadDurationTicks() {
+        ItemStack itemStack = this.mob.getMainHandItem();
+        return itemStack.getItem() instanceof GunItem ? Math.max(1, GunItem.getChargeDuration(itemStack)) : GunController.super.getReloadDurationTicks();
+    }
+
+    @Override
     public int getReadyDelayAfterAmmoFound() {
         return 20 + this.mob.getRandom().nextInt(20);
     }
@@ -72,6 +123,10 @@ public class VanillaGunController implements GunController {
     public void startReload() {
         if (!isValid()) {
             return;
+        }
+        ItemStack itemStack = this.mob.getMainHandItem();
+        if (GunItem.isCharged(itemStack)) {
+            GunItem.discardLoadedAmmo(itemStack);
         }
         this.mob.startUsingItem(ProjectileUtil.getWeaponHoldingHand(this.mob, item -> item instanceof GunItem));
         setChargingCrossbow(true);

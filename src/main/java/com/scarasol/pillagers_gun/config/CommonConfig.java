@@ -15,6 +15,7 @@ public class CommonConfig {
     public static final ForgeConfigSpec.ConfigValue<Boolean> BYPASS_INVULNERABLE;
     public static final ForgeConfigSpec.ConfigValue<Boolean> DYNAMIC_INACCURACY;
     public static final ForgeConfigSpec.ConfigValue<Boolean> FRIEND_FIRE;
+    public static final ForgeConfigSpec.ConfigValue<Boolean> ENABLE_CROSS_FIRE;
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> TAG_FRIENDLY_FIRE;
     public static final ForgeConfigSpec.ConfigValue<Boolean> BREAK_GLASS;
     public static final ForgeConfigSpec.ConfigValue<Double> LASER_ANGLE;
@@ -97,6 +98,11 @@ public class CommonConfig {
                 .define("Dynamic Inaccuracy", true);
         FRIEND_FIRE = BUILDER.comment("Whether the gun has friend fire.")
                 .define("Friend Fire", false);
+        ENABLE_CROSS_FIRE = BUILDER.comment("""
+                Enables cross-fire tactical AI for gun-wielding mobs.
+                This option is the tactical feature entry point for fire-team coordination and tactical reload scheduling.
+                """)
+                .define("Enable Cross Fire", false);
         TAG_FRIENDLY_FIRE = BUILDER.comment("Entities sharing the same tag from this list will be treated as allies.")
                 .defineList("Friendly Tag", ArrayList::new, entry -> true);
         BREAK_GLASS = BUILDER.comment("Whether the bullet will break the glass.")

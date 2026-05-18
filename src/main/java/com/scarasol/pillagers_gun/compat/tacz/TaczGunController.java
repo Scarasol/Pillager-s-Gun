@@ -4,6 +4,7 @@ import com.scarasol.pillagers_gun.config.CommonConfig;
 import com.scarasol.pillagers_gun.entity.goal.controller.DynamicFireRate;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunAimUtil;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunController;
+import com.scarasol.pillagers_gun.entity.goal.controller.GunRole;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunReloadResult;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunShotResult;
 import com.tacz.guns.api.TimelessAPI;
@@ -14,12 +15,17 @@ import com.tacz.guns.api.item.gun.FireMode;
 import com.tacz.guns.resource.index.CommonGunIndex;
 import com.tacz.guns.resource.pojo.data.gun.Bolt;
 import com.tacz.guns.resource.pojo.data.gun.GunData;
+import com.tacz.guns.resource.pojo.data.gun.GunReloadData;
+import com.tacz.guns.resource.pojo.data.gun.GunReloadTime;
+import com.tacz.guns.util.AttachmentDataUtils;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.monster.CrossbowAttackMob;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
+
+import java.util.Locale;
 
 public class TaczGunController implements GunController {
     private final Mob mob;
@@ -94,6 +100,68 @@ public class TaczGunController implements GunController {
             }
         }
         return 0;
+    }
+
+    @Override
+    public int getMaxAmmoCount() {
+        IGun gun = getGun();
+        ItemStack itemStack = this.mob.getMainHandItem();
+        if (gun == null || gun.useInventoryAmmo(itemStack)) {
+            return -1;
+        }
+        GunData gunData = getGunData(gun, itemStack);
+        if (gunData == null) {
+            return 0;
+        }
+        int maxAmmoCount = AttachmentDataUtils.getAmmoCountWithAttachment(itemStack, gunData);
+        if (maxAmmoCount <= 0) {
+            return 0;
+        }
+        return maxAmmoCount + (gunData.getBolt() != Bolt.OPEN_BOLT ? 1 : 0);
+    }
+
+    @Override
+    public GunRole getRole() {
+        String gunType = TaczCompat.getGunType(this.mob.getMainHandItem()).toLowerCase(Locale.ROOT);
+        return switch (gunType) {
+            case "rifle", "smg", "mg" -> GunRole.RIFLE;
+            case "shotgun" -> GunRole.SHOTGUN;
+            case "pistol" -> GunRole.PISTOL;
+            case "sniper" -> GunRole.SNIPER;
+            case "rpg", "launcher" -> GunRole.EXPLOSIVE;
+            default -> GunRole.OTHER;
+        };
+    }
+
+    @Override
+    public double getAmmoUsePerTick(double distanceToTarget) {
+        IGun gun = getGun();
+        ItemStack itemStack = this.mob.getMainHandItem();
+        if (gun == null) {
+            return GunController.super.getAmmoUsePerTick(distanceToTarget);
+        }
+        return DynamicFireRate.getStep(gun.getFireMode(itemStack) == FireMode.AUTO, gun.getRPM(itemStack), distanceToTarget, false);
+    }
+
+    @Override
+    public int getReloadDurationTicks() {
+        GunData gunData = getGunData();
+        if (gunData == null) {
+            return GunController.super.getReloadDurationTicks();
+        }
+        GunReloadData reloadData = gunData.getReloadData();
+        if (reloadData == null) {
+            return GunController.super.getReloadDurationTicks();
+        }
+        GunReloadTime reloadTime = reloadData.getFeed();
+        if (reloadTime == null) {
+            reloadTime = reloadData.getCooldown();
+        }
+        if (reloadTime == null) {
+            return GunController.super.getReloadDurationTicks();
+        }
+        float seconds = hasAmmo() ? reloadTime.getTacticalTime() : reloadTime.getEmptyTime();
+        return Math.max(1, Math.round(seconds * 20.0F));
     }
 
     @Override

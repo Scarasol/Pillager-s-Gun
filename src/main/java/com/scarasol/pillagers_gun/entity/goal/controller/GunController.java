@@ -18,6 +18,37 @@ public interface GunController {
 
     int getAmmoCount();
 
+    default int getMaxAmmoCount() {
+        return getAmmoCount();
+    }
+
+    default GunRole getRole() {
+        return GunRole.OTHER;
+    }
+
+    default double getSuppressivePower() {
+        return getRole().getSuppressivePower();
+    }
+
+    default double getAmmoUsePerTick(double distanceToTarget) {
+        return 1.0D / Math.max(1, getReadyDelayAfterReload());
+    }
+
+    default int getReloadDurationTicks() {
+        return 60;
+    }
+
+    default boolean shouldTacticalReload() {
+        int ammoCount = getAmmoCount();
+        int maxAmmoCount = getMaxAmmoCount();
+        return hasAmmo()
+                && canReload()
+                && ammoCount >= 0
+                && maxAmmoCount > 1
+                && ammoCount < maxAmmoCount
+                && getRole().shouldTacticalReload(ammoCount, maxAmmoCount);
+    }
+
     int getReadyDelayAfterAmmoFound();
 
     int getReadyDelayAfterReload();

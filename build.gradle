@@ -248,6 +248,14 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
 }
 
+tasks.register('runFireTeamCoordinatorTests', JavaExec) {
+    group = 'verification'
+    description = 'Runs lightweight tactical fire-team coordinator tests.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.scarasol.pillagers_gun.entity.goal.combat.FireTeamCoordinatorHarness'
+}
+
 idea {
     module {
         downloadSources = true
