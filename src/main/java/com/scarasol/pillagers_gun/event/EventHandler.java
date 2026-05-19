@@ -6,6 +6,7 @@ import com.scarasol.pillagers_gun.compat.tacz.TaczCompat;
 import com.scarasol.pillagers_gun.compat.recruits.RecruitCompat;
 import com.scarasol.pillagers_gun.config.CommonConfig;
 import com.scarasol.pillagers_gun.entity.goal.GunAttackGoal;
+import com.scarasol.pillagers_gun.entity.goal.combat.FireTeamCoordinator;
 import com.scarasol.pillagers_gun.event.server.InaccuracyEvent;
 import com.scarasol.pillagers_gun.init.PillagersGunItems;
 import com.scarasol.pillagers_gun.util.GunnerEquipmentService;
@@ -15,7 +16,9 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.*;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
+import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
+import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingEquipmentChangeEvent;
 import net.minecraftforge.event.entity.living.LivingKnockBackEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -50,6 +53,26 @@ public class EventHandler {
             if (!event.loadedFromDisk()) {
                 GunnerEquipmentService.scheduleBornWithGun(mob);
             }
+        }
+    }
+
+    @SubscribeEvent
+    public static void onEntityLeaveLevel(EntityLeaveLevelEvent event) {
+        if (event.getLevel().isClientSide()) {
+            return;
+        }
+        if (event.getEntity() instanceof Mob mob) {
+            FireTeamCoordinator.INSTANCE.remove(mob);
+        }
+    }
+
+    @SubscribeEvent
+    public static void onLivingDeath(LivingDeathEvent event) {
+        if (event.getEntity().level().isClientSide()) {
+            return;
+        }
+        if (event.getEntity() instanceof Mob mob) {
+            FireTeamCoordinator.INSTANCE.remove(mob);
         }
     }
 

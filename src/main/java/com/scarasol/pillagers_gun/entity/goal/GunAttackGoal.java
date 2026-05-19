@@ -7,7 +7,9 @@ import com.scarasol.pillagers_gun.entity.goal.combat.CombatAction;
 import com.scarasol.pillagers_gun.entity.goal.combat.CombatContext;
 import com.scarasol.pillagers_gun.entity.goal.combat.CombatDirector;
 import com.scarasol.pillagers_gun.entity.goal.combat.CombatIntent;
+import com.scarasol.pillagers_gun.entity.goal.combat.CombatMovementProfile;
 import com.scarasol.pillagers_gun.entity.goal.combat.CrossFireDirector;
+import com.scarasol.pillagers_gun.entity.goal.combat.FireTeamCoordinator;
 import com.scarasol.pillagers_gun.entity.goal.combat.NoTacticsDirector;
 import com.scarasol.pillagers_gun.entity.goal.controller.EmptyGunController;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunController;
@@ -34,6 +36,7 @@ public class GunAttackGoal<T extends Mob> extends Goal {
 
     public static MobEffect CONFUSION = ForgeRegistries.MOB_EFFECTS.getValue(new ResourceLocation("sona:confusion"));
     public static MobEffect BLIND = ForgeRegistries.MOB_EFFECTS.getValue(new ResourceLocation("lrtactical:blinded"));
+    private static final float HOLD_FIRE_MOVE_SCALE = 0.8F;
 
     private final T mob;
     private final double speedModifier;
@@ -44,6 +47,8 @@ public class GunAttackGoal<T extends Mob> extends Goal {
     private int ammoCount;
     private boolean away;
     private boolean stopped;
+    private int strafingTime = -1;
+    private boolean strafingClockwise;
 
     public GunAttackGoal(T mob, double speedModifier, float attackRadius) {
         this.mob = mob;
@@ -80,12 +85,15 @@ public class GunAttackGoal<T extends Mob> extends Goal {
         this.ammoCount = 0;
         this.away = false;
         this.stopped = false;
+        this.strafingTime = -1;
+        this.strafingClockwise = false;
         this.controller.start();
     }
 
     @Override
     public void stop() {
         super.stop();
+        FireTeamCoordinator.INSTANCE.remove(this.mob);
         this.mob.setAggressive(false);
         this.mob.setTarget(null);
         setLastPositon(null);
@@ -94,9 +102,11 @@ public class GunAttackGoal<T extends Mob> extends Goal {
         this.ammoCount = 0;
         this.away = false;
         this.stopped = false;
+        this.strafingTime = -1;
+        this.strafingClockwise = false;
         this.controller.stop();
         this.controller = EmptyGunController.INSTANCE;
-        this.mob.getNavigation().stop();
+        stopAllMovement();
     }
 
     @Override
@@ -129,31 +139,6 @@ public class GunAttackGoal<T extends Mob> extends Goal {
                 this.seeTime = 0;
             }
 
-            if (!stunned) {
-                if (distanceToTarget <= attackRadius && this.seeTime > 5) {
-                    if (!gunController.hasAmmo() || this.gunState == GunState.CHARGING) {
-                        this.stopped = false;
-                        if (distanceToTarget < attackRadius / 2) {
-                            this.away = true;
-                            Vec3 vec3 = this.mob.position().add(this.mob.position().subtract(livingentity.position().x, this.mob.position().y, livingentity.position().z).normalize().scale(attackRadius / 2));
-                            this.mob.getNavigation().moveTo(vec3.x, vec3.y, vec3.z, this.speedModifier);
-                        }
-                        if (this.away && distanceToTarget > attackRadius * 2 / 3) {
-                            this.mob.getNavigation().stop();
-                            this.away = false;
-                        } else if (!this.away && distanceToTarget < attackRadius * 2 / 3) {
-                            this.mob.getNavigation().stop();
-                        }
-                    } else if (!this.stopped) {
-                        this.mob.getNavigation().stop();
-                        this.stopped = true;
-                    }
-                } else {
-                    this.stopped = false;
-                    this.mob.getNavigation().moveTo(livingentity, this.canRun() ? this.speedModifier : this.speedModifier * 0.5D);
-                }
-                this.mob.getLookControl().setLookAt(livingentity, 30.0F, 30.0F);
-            }
             flag2 = (distanceToTarget > attackRadius || this.seeTime < 5) && this.attackDelay == 0;
         }
 
@@ -183,6 +168,7 @@ public class GunAttackGoal<T extends Mob> extends Goal {
         CombatContext combatContext = createCombatContext(gunController, livingentity, targetValid, flag, stunned, flag2, distanceToTarget, attackRadius);
         CombatDirector combatDirector = combatDirector();
         CombatIntent combatIntent = combatDirector.selectIntent(combatContext);
+        updateTargetMovement(gunController, livingentity, targetValid, flag, stunned, combatIntent, distanceToTarget, attackRadius);
 
         switch (this.gunState) {
             case UNCHARGED -> {
@@ -232,6 +218,154 @@ public class GunAttackGoal<T extends Mob> extends Goal {
 
     private CombatDirector combatDirector() {
         return CommonConfig.ENABLE_CROSS_FIRE.get() ? CrossFireDirector.INSTANCE : NoTacticsDirector.INSTANCE;
+    }
+
+    private void updateTargetMovement(GunController gunController,
+                                      @Nullable LivingEntity target,
+                                      boolean targetValid,
+                                      boolean hasLineOfSight,
+                                      boolean stunned,
+                                      CombatIntent combatIntent,
+                                      double distanceToTarget,
+                                      double attackRadius) {
+        if (!targetValid || target == null || stunned) {
+            stopAllMovement();
+            return;
+        }
+
+        if (distanceToTarget > attackRadius || this.seeTime <= 5) {
+            chaseTarget(target);
+            return;
+        }
+
+        boolean reloadMovement = !gunController.hasAmmo()
+                || this.gunState == GunState.CHARGING
+                || combatIntent.action() == CombatAction.RELOAD;
+        if (reloadMovement) {
+            updateReloadMovement(target, distanceToTarget, attackRadius);
+            lookAtTarget(target);
+            return;
+        }
+
+        updateCombatStrafe(gunController, target, hasLineOfSight, combatIntent, distanceToTarget, attackRadius);
+        lookAtTarget(target);
+    }
+
+    private void chaseTarget(LivingEntity target) {
+        resetCombatMovement();
+        this.stopped = false;
+        this.away = false;
+        this.mob.getNavigation().moveTo(target, this.canRun() ? this.speedModifier : this.speedModifier * 0.5D);
+        lookAtTarget(target);
+    }
+
+    private void updateReloadMovement(LivingEntity target, double distanceToTarget, double attackRadius) {
+        resetCombatMovement();
+        this.stopped = false;
+        if (distanceToTarget < attackRadius / 2.0D) {
+            this.away = true;
+            Vec3 retreatTarget = this.mob.position().add(this.mob.position().subtract(target.position().x, this.mob.position().y, target.position().z).normalize().scale(attackRadius / 2.0D));
+            this.mob.getNavigation().moveTo(retreatTarget.x, retreatTarget.y, retreatTarget.z, this.speedModifier);
+        }
+        if (this.away && distanceToTarget > attackRadius * 2.0D / 3.0D) {
+            this.mob.getNavigation().stop();
+            this.away = false;
+        } else if (!this.away && distanceToTarget < attackRadius * 2.0D / 3.0D) {
+            this.mob.getNavigation().stop();
+        }
+    }
+
+    private void holdCurrentPosition() {
+        resetCombatMovement();
+        this.away = false;
+        if (!this.stopped) {
+            stopAllMovement();
+            this.stopped = true;
+        } else {
+            clearMoveInput();
+        }
+    }
+
+    private void updateCombatStrafe(GunController gunController,
+                                    LivingEntity target,
+                                    boolean hasLineOfSight,
+                                    CombatIntent combatIntent,
+                                    double distanceToTarget,
+                                    double attackRadius) {
+        this.away = false;
+        this.stopped = true;
+        this.mob.getNavigation().stop();
+
+        if (!hasLineOfSight) {
+            resetCombatMovement();
+            clearMoveInput();
+            return;
+        }
+
+        if (this.strafingTime < 0) {
+            this.strafingTime = 0;
+        }
+        if (++this.strafingTime >= 20) {
+            if (this.mob.getRandom().nextFloat() < 0.3F) {
+                this.strafingClockwise = !this.strafingClockwise;
+            }
+            this.strafingTime = 0;
+        }
+
+        CombatMovementProfile profile = CombatMovementProfile.forRole(gunController.getRole());
+        double distanceRatio = attackRadius <= 0.0D ? 1.0D : distanceToTarget / attackRadius;
+        boolean targetLookingAtMob = isTargetLookingAtMob(target, profile.targetLookAngleDegrees(distanceRatio));
+        float stateMoveScale = getStateMoveScale(combatIntent);
+        float forward = scaleMovement(profile.forward(distanceRatio), stateMoveScale);
+        float strafe = scaleMovement(profile.strafe(targetLookingAtMob, this.strafingClockwise), stateMoveScale);
+        if (profile.shouldMove(forward, strafe)) {
+            this.mob.getMoveControl().strafe(forward, strafe);
+            if (this.mob.getControlledVehicle() instanceof Mob vehicle) {
+                vehicle.lookAt(target, 30.0F, 30.0F);
+            }
+        } else {
+            clearMoveInput();
+        }
+    }
+
+    private float getStateMoveScale(CombatIntent combatIntent) {
+        return combatIntent.action() == CombatAction.HOLD_FIRE ? HOLD_FIRE_MOVE_SCALE : 1.0F;
+    }
+
+    private float scaleMovement(float movement, float stateMoveScale) {
+        return (float) Math.max(-1.0D, Math.min(1.0D, movement * this.speedModifier * stateMoveScale));
+    }
+
+    private boolean isTargetLookingAtMob(LivingEntity target, double angleThresholdDegrees) {
+        Vec3 targetLook = target.getLookAngle();
+        Vec3 targetToMob = this.mob.getEyePosition().subtract(target.getEyePosition());
+        if (targetLook.lengthSqr() < 1.0E-6D || targetToMob.lengthSqr() < 1.0E-6D) {
+            return false;
+        }
+        double dot = targetLook.normalize().dot(targetToMob.normalize());
+        return dot >= Math.cos(Math.toRadians(angleThresholdDegrees));
+    }
+
+    private void resetCombatMovement() {
+        this.strafingTime = -1;
+    }
+
+    private void stopAllMovement() {
+        resetCombatMovement();
+        this.mob.getNavigation().stop();
+        clearMoveInput();
+    }
+
+    private void clearMoveInput() {
+        this.mob.getMoveControl().strafe(0.0F, 0.0F);
+        this.mob.setXxa(0.0F);
+        this.mob.setZza(0.0F);
+        this.mob.setSpeed(0.0F);
+    }
+
+    private void lookAtTarget(LivingEntity target) {
+        this.mob.getLookControl().setLookAt(target, 30.0F, 30.0F);
+        this.mob.lookAt(target, 30.0F, 30.0F);
     }
 
     private CombatContext createCombatContext(GunController gunController,

@@ -26,6 +26,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.Locale;
+import java.util.Map;
 
 public class TaczGunController implements GunController {
     private final Mob mob;
@@ -140,7 +141,11 @@ public class TaczGunController implements GunController {
         if (gun == null) {
             return GunController.super.getAmmoUsePerTick(distanceToTarget);
         }
-        return DynamicFireRate.getStep(gun.getFireMode(itemStack) == FireMode.AUTO, gun.getRPM(itemStack), distanceToTarget, false);
+        GunData gunData = getGunData(gun, itemStack);
+        if (gunData == null) {
+            return GunController.super.getAmmoUsePerTick(distanceToTarget);
+        }
+        return getFireRateStep(gun, itemStack, gunData, distanceToTarget, false);
     }
 
     @Override
@@ -149,13 +154,17 @@ public class TaczGunController implements GunController {
         if (gunData == null) {
             return GunController.super.getReloadDurationTicks();
         }
+        int scriptedReloadTicks = estimateScriptedReloadTicks(gunData);
+        if (scriptedReloadTicks > 0) {
+            return scriptedReloadTicks;
+        }
         GunReloadData reloadData = gunData.getReloadData();
         if (reloadData == null) {
             return GunController.super.getReloadDurationTicks();
         }
-        GunReloadTime reloadTime = reloadData.getFeed();
+        GunReloadTime reloadTime = reloadData.getCooldown();
         if (reloadTime == null) {
-            reloadTime = reloadData.getCooldown();
+            reloadTime = reloadData.getFeed();
         }
         if (reloadTime == null) {
             return GunController.super.getReloadDurationTicks();
@@ -261,7 +270,7 @@ public class TaczGunController implements GunController {
             return GunShotResult.noShot(ammoCount);
         }
 
-        this.attackCount += DynamicFireRate.getStep(gun.getFireMode(itemStack) == FireMode.AUTO, gun.getRPM(itemStack), distance, isStunned);
+        this.attackCount += getFireRateStep(gun, itemStack, gunData, distance, isStunned);
 
         int currentAmmo = ammoCount;
         for (; this.attackCount >= 1; this.attackCount--) {
@@ -298,6 +307,90 @@ public class TaczGunController implements GunController {
 
     private GunData getGunData(IGun gun, ItemStack itemStack) {
         return TimelessAPI.getCommonGunIndex(gun.getGunId(itemStack)).map(CommonGunIndex::getGunData).orElse(null);
+    }
+
+    private int estimateScriptedReloadTicks(GunData gunData) {
+        Map<String, Object> scriptParam = gunData.getScriptParam();
+        if (scriptParam == null || !scriptParam.containsKey("loop")) {
+            return -1;
+        }
+
+        boolean hasAmmo = hasAmmo();
+        String introKey = hasAmmo ? "intro" : (isBurstMode() && scriptParam.containsKey("intro_empty_semi") ? "intro_empty_semi" : "intro_empty");
+        float introSeconds = getScriptParamFloat(scriptParam, introKey, -1.0F);
+        float loopSeconds = getScriptParamFloat(scriptParam, "loop", -1.0F);
+        if (introSeconds < 0.0F || loopSeconds <= 0.0F) {
+            return -1;
+        }
+
+        int missingAmmo = Math.max(1, getMissingAmmoCount());
+        float endingSeconds = Math.max(0.0F, getScriptParamFloat(scriptParam, "ending", 0.0F));
+        float loop2Seconds = getScriptParamFloat(scriptParam, "loop_2", -1.0F);
+        float seconds = introSeconds + endingSeconds;
+        if (loop2Seconds > 0.0F && missingAmmo > 1) {
+            seconds += (missingAmmo / 2) * loop2Seconds + (missingAmmo % 2) * loopSeconds;
+        } else {
+            seconds += missingAmmo * loopSeconds;
+        }
+        return Math.max(1, Math.round(seconds * 20.0F));
+    }
+
+    private int getMissingAmmoCount() {
+        int maxAmmoCount = getMaxAmmoCount();
+        int ammoCount = getAmmoCount();
+        if (maxAmmoCount <= 0 || ammoCount < 0) {
+            return 0;
+        }
+        return Math.max(0, maxAmmoCount - ammoCount);
+    }
+
+    private boolean isBurstMode() {
+        IGun gun = getGun();
+        return gun != null && gun.getFireMode(this.mob.getMainHandItem()) == FireMode.BURST;
+    }
+
+    private float getScriptParamFloat(Map<String, Object> scriptParam, String key, float fallback) {
+        Object value = scriptParam.get(key);
+        if (value instanceof Number number) {
+            return number.floatValue();
+        }
+        if (value instanceof String stringValue) {
+            try {
+                return Float.parseFloat(stringValue);
+            } catch (NumberFormatException ignored) {
+                return fallback;
+            }
+        }
+        return fallback;
+    }
+
+    private double getFireRateStep(IGun gun, ItemStack itemStack, GunData gunData, double distance, boolean stunned) {
+        double baseStep = DynamicFireRate.getStep(gun.getFireMode(itemStack) == FireMode.AUTO, gun.getRPM(itemStack), distance, stunned);
+        return limitAmmoUseByAction(baseStep, getActionCycleTicks(gunData));
+    }
+
+    private double getActionCycleTicks(GunData gunData) {
+        if (gunData.getBolt() != Bolt.MANUAL_ACTION) {
+            return 0.0D;
+        }
+
+        Map<String, Object> scriptParam = gunData.getScriptParam();
+        if (scriptParam != null) {
+            float scriptBoltSeconds = getScriptParamFloat(scriptParam, "bolt_time", -1.0F);
+            if (scriptBoltSeconds > 0.0F) {
+                return scriptBoltSeconds * 20.0D;
+            }
+        }
+
+        float boltActionSeconds = gunData.getBoltActionTime();
+        return boltActionSeconds > 0.0F ? boltActionSeconds * 20.0D : 0.0D;
+    }
+
+    private double limitAmmoUseByAction(double ammoUsePerTick, double actionCycleTicks) {
+        if (actionCycleTicks <= 0.0D) {
+            return ammoUsePerTick;
+        }
+        return Math.min(ammoUsePerTick, 1.0D / actionCycleTicks);
     }
 
     private double getAttackReachSqr(LivingEntity target) {

@@ -8,9 +8,11 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.Level;
 
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -32,6 +34,7 @@ public class FireTeamCoordinator {
     private static final double EPSILON = 1.0E-6D;
 
     private final Map<TeamKey, FireTeam> teams = new HashMap<>();
+    private final Map<UUID, TeamKey> memberTeams = new HashMap<>();
     private long lastCleanupTick;
 
     private FireTeamCoordinator() {
@@ -40,6 +43,7 @@ public class FireTeamCoordinator {
     public void update(CombatContext context) {
         FireTeam fireTeam = getFireTeam(context);
         if (fireTeam == null) {
+            remove(context.mob());
             return;
         }
         fireTeam.update(context, false);
@@ -49,6 +53,7 @@ public class FireTeamCoordinator {
     public boolean shouldTacticalReload(CombatContext context) {
         FireTeam fireTeam = getFireTeam(context);
         if (fireTeam == null) {
+            remove(context.mob());
             return false;
         }
 
@@ -61,6 +66,7 @@ public class FireTeamCoordinator {
     public ReloadPermission requestReload(CombatContext context) {
         FireTeam fireTeam = getFireTeam(context);
         if (fireTeam == null) {
+            remove(context.mob());
             return ReloadPermission.ALLOW;
         }
 
@@ -76,6 +82,7 @@ public class FireTeamCoordinator {
     public boolean shouldHoldFire(CombatContext context) {
         FireTeam fireTeam = getFireTeam(context);
         if (fireTeam == null) {
+            remove(context.mob());
             return false;
         }
 
@@ -91,7 +98,36 @@ public class FireTeamCoordinator {
             return null;
         }
         TeamKey teamKey = new TeamKey(context.mob().level().dimension(), target.getUUID());
+        UUID mobId = context.mob().getUUID();
+        TeamKey previousTeamKey = this.memberTeams.get(mobId);
+        if (previousTeamKey != null && !previousTeamKey.equals(teamKey)) {
+            remove(mobId);
+        }
+        this.memberTeams.put(mobId, teamKey);
         return this.teams.computeIfAbsent(teamKey, key -> new FireTeam());
+    }
+
+    public void remove(Mob mob) {
+        if (mob != null) {
+            remove(mob.getUUID());
+        }
+    }
+
+    void remove(UUID mobId) {
+        TeamKey teamKey = this.memberTeams.remove(mobId);
+        if (teamKey == null) {
+            return;
+        }
+
+        FireTeam fireTeam = this.teams.get(teamKey);
+        if (fireTeam == null) {
+            return;
+        }
+
+        fireTeam.removeMember(mobId);
+        if (fireTeam.members.isEmpty()) {
+            this.teams.remove(teamKey);
+        }
     }
 
     private void cleanupTeams(long gameTime) {
@@ -102,8 +138,14 @@ public class FireTeamCoordinator {
 
         Iterator<Map.Entry<TeamKey, FireTeam>> iterator = this.teams.entrySet().iterator();
         while (iterator.hasNext()) {
-            FireTeam fireTeam = iterator.next().getValue();
-            fireTeam.removeExpired(gameTime);
+            Map.Entry<TeamKey, FireTeam> entry = iterator.next();
+            TeamKey teamKey = entry.getKey();
+            FireTeam fireTeam = entry.getValue();
+            for (UUID mobId : fireTeam.removeExpired(gameTime)) {
+                if (teamKey.equals(this.memberTeams.get(mobId))) {
+                    this.memberTeams.remove(mobId);
+                }
+            }
             if (fireTeam.members.isEmpty()) {
                 iterator.remove();
             }
@@ -467,7 +509,19 @@ public class FireTeamCoordinator {
                     && gameTime >= member.nextFireEligibleTick;
         }
 
-        private void removeExpired(long gameTime) {
+        private void removeMember(UUID mobId) {
+            FireTeamMember member = this.members.remove(mobId);
+            if (member == null) {
+                return;
+            }
+            if (member.registered) {
+                removeStats(member);
+            }
+            this.highPowerOutputRequests.remove(mobId);
+        }
+
+        private List<UUID> removeExpired(long gameTime) {
+            List<UUID> expiredMobIds = new ArrayList<>();
             Iterator<FireTeamMember> iterator = this.members.values().iterator();
             while (iterator.hasNext()) {
                 FireTeamMember member = iterator.next();
@@ -478,8 +532,10 @@ public class FireTeamCoordinator {
                     removeStats(member);
                 }
                 this.highPowerOutputRequests.remove(member.mobId);
+                expiredMobIds.add(member.mobId);
                 iterator.remove();
             }
+            return expiredMobIds;
         }
 
         private static boolean canProvideFire(CombatContext context) {

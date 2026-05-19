@@ -4,7 +4,9 @@ import com.atsuishio.superbwarfare.data.gun.FireMode;
 import com.atsuishio.superbwarfare.data.gun.FireModeInfo;
 import com.atsuishio.superbwarfare.data.gun.GunData;
 import com.atsuishio.superbwarfare.data.gun.GunProp;
+import com.atsuishio.superbwarfare.data.gun.ReloadType;
 import com.atsuishio.superbwarfare.data.gun.ShootParameters;
+import com.atsuishio.superbwarfare.event.GunEventHandler;
 import com.atsuishio.superbwarfare.item.gun.GunItem;
 import com.scarasol.pillagers_gun.entity.goal.controller.DynamicFireRate;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunAimUtil;
@@ -21,6 +23,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.Locale;
+import java.util.Set;
 
 public class SbwGunController implements GunController {
     private final Mob mob;
@@ -103,9 +106,7 @@ public class SbwGunController implements GunController {
         if (data == null) {
             return GunController.super.getAmmoUsePerTick(distanceToTarget);
         }
-        FireMode fireMode = getFireMode(data);
-        int rpm = Math.max(1, getInt(data, GunProp.RPM));
-        return DynamicFireRate.getStep(fireMode == FireMode.AUTO, rpm, distanceToTarget, false);
+        return getFireRateStep(data, distanceToTarget, false);
     }
 
     @Override
@@ -114,8 +115,11 @@ public class SbwGunController implements GunController {
         if (data == null) {
             return GunController.super.getReloadDurationTicks();
         }
-        int reloadMillis = getInt(data, getAmmoCount(data) > 0 ? GunProp.NORMAL_RELOAD_TIME : GunProp.EMPTY_RELOAD_TIME);
-        return Math.max(1, Math.round(reloadMillis / 50.0F));
+        if (isIterativeReload(data)) {
+            return estimateIterativeReloadTicks(data);
+        }
+        int reloadTicks = getInt(data, getAmmoCount(data) > 0 ? GunProp.NORMAL_RELOAD_TIME : GunProp.EMPTY_RELOAD_TIME);
+        return Math.max(1, reloadTicks);
     }
 
     @Override
@@ -134,7 +138,7 @@ public class SbwGunController implements GunController {
         if (data == null) {
             return;
         }
-        data.startReload();
+        GunEventHandler.INSTANCE.tryStartReload(this.mob, data);
         setChargingCrossbow(true);
     }
 
@@ -198,11 +202,7 @@ public class SbwGunController implements GunController {
         }
 
         FireMode fireMode = getFireMode(data);
-        boolean automatic = fireMode == FireMode.AUTO;
-        int rpm = Math.max(1, getInt(data, GunProp.RPM));
-        this.attackCount += automatic
-                ? DynamicFireRate.getStep(true, rpm, distance, isStunned)
-                : DynamicFireRate.getSemiAutoStep(rpm, distance, isStunned);
+        this.attackCount += getFireRateStep(data, distance, isStunned);
 
         int currentAmmo = ammoCount;
         while (this.attackCount >= 1) {
@@ -280,6 +280,59 @@ public class SbwGunController implements GunController {
     private GunData getGunData() {
         ItemStack itemStack = this.mob.getMainHandItem();
         return itemStack.getItem() instanceof GunItem ? GunData.from(itemStack) : null;
+    }
+
+    private boolean isIterativeReload(GunData data) {
+        Set<ReloadType> reloadTypes = data.get(GunProp.RELOAD_TYPES);
+        return reloadTypes != null && reloadTypes.contains(ReloadType.ITERATIVE);
+    }
+
+    private int estimateIterativeReloadTicks(GunData data) {
+        int missingAmmo = Math.max(1, getMissingAmmoCount(data));
+        boolean hasAmmo = getAmmoCount(data) > 0;
+        int prepareTicks = getIterativePrepareTicks(data, hasAmmo);
+        int loadedDuringPrepare = hasAmmo && getInt(data, GunProp.PREPARE_LOAD_TIME) > 0 ? 1 : 0;
+        int remainingAmmo = Math.max(0, missingAmmo - loadedDuringPrepare);
+        int loadAmount = Math.max(1, getInt(data, GunProp.ITERATIVE_LOAD_AMOUNT));
+        int loadLoops = (remainingAmmo + loadAmount - 1) / loadAmount;
+        int loopTicks = Math.max(0, getInt(data, GunProp.ITERATIVE_TIME));
+        int finishTicks = Math.max(0, getInt(data, GunProp.FINISH_TIME));
+        return Math.max(1, prepareTicks + loadLoops * loopTicks + finishTicks);
+    }
+
+    private int getIterativePrepareTicks(GunData data, boolean hasAmmo) {
+        if (hasAmmo && getInt(data, GunProp.PREPARE_LOAD_TIME) > 0) {
+            return getInt(data, GunProp.PREPARE_LOAD_TIME);
+        }
+        if (!hasAmmo && getInt(data, GunProp.PREPARE_EMPTY_TIME) > 0) {
+            return getInt(data, GunProp.PREPARE_EMPTY_TIME);
+        }
+        return Math.max(0, getInt(data, GunProp.PREPARE_TIME));
+    }
+
+    private int getMissingAmmoCount(GunData data) {
+        int maxAmmoCount = Math.max(0, getInt(data, GunProp.MAGAZINE));
+        int ammoCount = Math.max(0, getAmmoCount(data));
+        return Math.max(0, maxAmmoCount - ammoCount);
+    }
+
+    private double getFireRateStep(GunData data, double distance, boolean stunned) {
+        FireMode fireMode = getFireMode(data);
+        int rpm = Math.max(1, getInt(data, GunProp.RPM));
+        double baseStep = DynamicFireRate.getStep(fireMode == FireMode.AUTO, rpm, distance, stunned);
+        return limitAmmoUseByAction(baseStep, getActionCycleTicks(data));
+    }
+
+    private double getActionCycleTicks(GunData data) {
+        int boltActionTicks = getInt(data, GunProp.BOLT_ACTION_TIME);
+        return boltActionTicks > 0 ? boltActionTicks + 1.0D : 0.0D;
+    }
+
+    private double limitAmmoUseByAction(double ammoUsePerTick, double actionCycleTicks) {
+        if (actionCycleTicks <= 0.0D) {
+            return ammoUsePerTick;
+        }
+        return Math.min(ammoUsePerTick, 1.0D / actionCycleTicks);
     }
 
     private int getAmmoCount(GunData data) {

@@ -5,7 +5,9 @@ import com.scarasol.pillagers_gun.entity.goal.controller.GunController;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunReloadResult;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunRole;
 import com.scarasol.pillagers_gun.entity.goal.controller.GunShotResult;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
 import java.lang.reflect.Constructor;
@@ -19,17 +21,25 @@ public final class FireTeamCoordinatorHarness {
     private static final String PREFIX = "com.scarasol.pillagers_gun.entity.goal.combat.FireTeamCoordinator$";
     private static final Class<?> FIRE_TEAM_CLASS;
     private static final Class<?> MEMBER_CLASS;
+    private static final Class<?> TEAM_KEY_CLASS;
+    private static final Constructor<FireTeamCoordinator> COORDINATOR_CONSTRUCTOR;
     private static final Constructor<?> FIRE_TEAM_CONSTRUCTOR;
     private static final Constructor<?> MEMBER_CONSTRUCTOR;
+    private static final Constructor<?> TEAM_KEY_CONSTRUCTOR;
 
     static {
         try {
             FIRE_TEAM_CLASS = Class.forName(PREFIX + "FireTeam");
             MEMBER_CLASS = Class.forName(PREFIX + "FireTeamMember");
+            TEAM_KEY_CLASS = Class.forName(PREFIX + "TeamKey");
+            COORDINATOR_CONSTRUCTOR = FireTeamCoordinator.class.getDeclaredConstructor();
+            COORDINATOR_CONSTRUCTOR.setAccessible(true);
             FIRE_TEAM_CONSTRUCTOR = FIRE_TEAM_CLASS.getDeclaredConstructor();
             FIRE_TEAM_CONSTRUCTOR.setAccessible(true);
             MEMBER_CONSTRUCTOR = MEMBER_CLASS.getDeclaredConstructor(UUID.class);
             MEMBER_CONSTRUCTOR.setAccessible(true);
+            TEAM_KEY_CONSTRUCTOR = TEAM_KEY_CLASS.getDeclaredConstructor(ResourceKey.class, UUID.class);
+            TEAM_KEY_CONSTRUCTOR.setAccessible(true);
         } catch (ReflectiveOperationException exception) {
             throw new ExceptionInInitializerError(exception);
         }
@@ -47,6 +57,9 @@ public final class FireTeamCoordinatorHarness {
         run("low power member cannot request takeover", FireTeamCoordinatorHarness::lowPowerMemberCannotRequestTakeover);
         run("low power output hands off to FIFO high power request", FireTeamCoordinatorHarness::lowPowerHandsOffToHighPowerRequest);
         run("empty reload ignores positioning delay", FireTeamCoordinatorHarness::emptyReloadIgnoresPositioningDelay);
+        run("explicit remove releases output and exits team", FireTeamCoordinatorHarness::explicitRemoveReleasesOutputAndExitsTeam);
+        run("movement profile combines forward and strafe", FireTeamCoordinatorHarness::movementProfileCombinesForwardAndStrafe);
+        run("movement profile follows role preferences", FireTeamCoordinatorHarness::movementProfileFollowsRolePreferences);
         System.out.println("FireTeamCoordinatorHarness: all tests passed");
     }
 
@@ -174,8 +187,67 @@ public final class FireTeamCoordinatorHarness {
         assertTrue((Boolean) shouldRequestReload, "CrossFire should request empty reload despite positioning delay");
     }
 
+    private static void explicitRemoveReleasesOutputAndExitsTeam() throws Exception {
+        FireTeamCoordinator coordinator = newCoordinator();
+        UUID mobId = UUID.randomUUID();
+        Object teamKey = teamKey(UUID.randomUUID());
+        Object team = newFireTeam();
+        Object member = member(mobId, GunRole.RIFLE, 3.0D, 1.0D, TacticalFireState.FIRE_OUTPUT, 100L);
+
+        set(team, "tacticalMemberCount", 1);
+        set(team, "totalPower", 3.0D);
+        set(team, "fireCapableCount", 1);
+        set(team, "fireCapableContribution", 3.0D);
+        set(team, "activeFireOutputCount", 1);
+        set(team, "activeFireOutputPower", 3.0D);
+        ((int[]) get(team, "bucketCounts"))[4] = 1;
+        ((double[]) get(team, "bucketPower"))[4] = 3.0D;
+        members(team).put(mobId, member);
+        teams(coordinator).put(teamKey, team);
+        memberTeams(coordinator).put(mobId, teamKey);
+
+        coordinator.remove(mobId);
+
+        assertEquals(0, members(team).size(), "removed mob should leave FireTeam members");
+        assertFalse(memberTeams(coordinator).containsKey(mobId), "reverse membership should be cleared");
+        assertFalse(teams(coordinator).containsKey(teamKey), "empty FireTeam should be removed");
+        assertEquals(0, ((Number) get(team, "activeFireOutputCount")).intValue(), "output count should be released immediately");
+        assertClose(0.0D, ((Number) get(team, "activeFireOutputPower")).doubleValue(), "output power should be released immediately");
+    }
+
+    private static void movementProfileCombinesForwardAndStrafe() {
+        CombatMovementProfile rifle = CombatMovementProfile.forRole(GunRole.RIFLE);
+        float forward = rifle.forward(0.95D);
+        float strafe = rifle.strafe(true, true);
+
+        assertTrue(forward > 0.0F, "far rifle should press forward");
+        assertTrue(strafe > 0.0F, "rifle should strafe when target is looking at it");
+        assertTrue(rifle.shouldMove(forward, strafe), "combined movement should be active");
+    }
+
+    private static void movementProfileFollowsRolePreferences() {
+        CombatMovementProfile rifle = CombatMovementProfile.forRole(GunRole.RIFLE);
+        CombatMovementProfile shotgun = CombatMovementProfile.forRole(GunRole.SHOTGUN);
+        CombatMovementProfile sniper = CombatMovementProfile.forRole(GunRole.SNIPER);
+
+        assertTrue(Math.abs(rifle.strafe(true, true)) > Math.abs(sniper.strafe(true, true)), "rifle should strafe more than sniper");
+        assertTrue(shotgun.forward(0.75D) > rifle.forward(0.75D), "shotgun should press harder at mid range");
+        assertTrue(CombatMovementProfile.forRole(GunRole.PISTOL).forwardWeight() > shotgun.forwardWeight(), "pistol should have higher forward/back speed weight than shotgun");
+        assertClose(0.0D, rifle.strafe(false, true), "rifle should not strafe when target is not looking at it");
+        assertClose(30.0D, rifle.targetLookAngleDegrees(0.0D), "close target look angle should be narrow");
+        assertClose(5.0D, rifle.targetLookAngleDegrees(1.0D), "far target look angle should be very narrow");
+    }
+
+    private static FireTeamCoordinator newCoordinator() throws ReflectiveOperationException {
+        return COORDINATOR_CONSTRUCTOR.newInstance();
+    }
+
     private static Object newFireTeam() throws ReflectiveOperationException {
         return FIRE_TEAM_CONSTRUCTOR.newInstance();
+    }
+
+    private static Object teamKey(UUID targetId) throws ReflectiveOperationException {
+        return TEAM_KEY_CONSTRUCTOR.newInstance(null, targetId);
     }
 
     private static Object member(UUID mobId, GunRole role, double suppressivePower, double fireHealth, TacticalFireState fireState, long gameTime) throws ReflectiveOperationException {
@@ -255,6 +327,16 @@ public final class FireTeamCoordinatorHarness {
     @SuppressWarnings("unchecked")
     private static LinkedHashSet<UUID> requestSet(Object team) throws ReflectiveOperationException {
         return (LinkedHashSet<UUID>) get(team, "highPowerOutputRequests");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<Object, Object> teams(FireTeamCoordinator coordinator) throws ReflectiveOperationException {
+        return (Map<Object, Object>) get(coordinator, "teams");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<UUID, Object> memberTeams(FireTeamCoordinator coordinator) throws ReflectiveOperationException {
+        return (Map<UUID, Object>) get(coordinator, "memberTeams");
     }
 
     private static void run(String name, ThrowingRunnable runnable) throws Exception {
